@@ -458,4 +458,5 @@ app.use((error, req, res, next) => {
 
 // 서버 시작 로직은 server.js로 이동됨
 
-module.exports = { app, setRedisClient };
+module.exports = app;
+module.exports.setRedisClient = setRedisClient;

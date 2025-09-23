@@ -5,7 +5,8 @@
  * 프로덕션 환경에서만 실행됩니다.
  */
 
-const { app, setRedisClient } = require('./app');
+const app = require('./app');
+const setRedisClient = app.setRedisClient;
 const { Pool } = require('pg');
 const redis = require('redis');
 const winston = require('winston');
