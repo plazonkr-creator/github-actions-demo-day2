@@ -333,7 +333,7 @@ jobs:
     name: AWS VM 배포
     runs-on: ubuntu-latest
     needs: [build-and-push, security-scan]
-    if: github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'staging'
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/day2-advanced' || github.event.inputs.environment == 'staging'
     environment: aws-staging
     steps:
     - name: AWS VM 배포
@@ -371,7 +371,7 @@ jobs:
     name: GCP VM 배포
     runs-on: ubuntu-latest
     needs: [build-and-push, security-scan]
-    if: github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'staging'
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/day2-advanced' || github.event.inputs.environment == 'staging'
     environment: gcp-staging
     steps:
     - name: GCP VM 배포
@@ -409,7 +409,7 @@ jobs:
     name: AWS 프로덕션 배포
     runs-on: ubuntu-latest
     needs: [build-and-push, security-scan]
-    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'production'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/day2-advanced' || github.event.inputs.environment == 'production'
     environment: aws-production
     steps:
     - name: AWS 프로덕션 배포
@@ -451,7 +451,7 @@ jobs:
     name: GCP 프로덕션 배포
     runs-on: ubuntu-latest
     needs: [build-and-push, security-scan]
-    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'production'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/day2-advanced' || github.event.inputs.environment == 'production'
     environment: gcp-production
     steps:
     - name: GCP 프로덕션 배포
