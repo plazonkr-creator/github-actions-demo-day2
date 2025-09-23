@@ -8,6 +8,15 @@ on:
     branches: [ day2-advanced, develop ]
   workflow_dispatch:
     inputs:
+      provider:
+        description: '클라우드 프로바이더를 선택하세요'
+        required: true
+        default: 'aws'
+        type: choice
+        options:
+          - aws
+          - gcp
+          - both
       environment:
         description: '배포 환경을 선택하세요'
         required: true
@@ -330,10 +339,10 @@ jobs:
 
   # AWS VM 배포 (PROD)
   deploy-aws:
-    name: AWS VM 배포 (PROD)
+    name: AWS 배포 (STAGING)
     runs-on: ubuntu-latest
     needs: [build-and-push, security-scan]
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/day2-advanced' || github.event.inputs.environment == 'staging'
+    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/day2-advanced' || github.event.inputs.environment == 'staging') && (github.event.inputs.provider == 'aws' || github.event.inputs.provider == 'both' || github.event.inputs.provider == null)
     environment: aws-production
     steps:
     - name: 코드 체크아웃
@@ -492,10 +501,10 @@ jobs:
 
   # GCP VM 배포 (STAGING)
   deploy-gcp:
-    name: GCP VM 배포 (STAGING)
+    name: GCP 배포 (STAGING)
     runs-on: ubuntu-latest
     needs: [build-and-push, security-scan]
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/day2-advanced' || github.event.inputs.environment == 'staging'
+    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/day2-advanced' || github.event.inputs.environment == 'staging') && (github.event.inputs.provider == 'gcp' || github.event.inputs.provider == 'both' || github.event.inputs.provider == null)
     environment: gcp-staging
     steps:
     - name: 코드 체크아웃
@@ -617,10 +626,10 @@ jobs:
 
   # AWS 프로덕션 배포
   deploy-aws-production:
-    name: AWS 프로덕션 배포
+    name: AWS 배포 (PRODUCTION)
     runs-on: ubuntu-latest
     needs: [build-and-push, security-scan]
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/day2-advanced' || github.event.inputs.environment == 'production'
+    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/day2-advanced' || github.event.inputs.environment == 'production') && (github.event.inputs.provider == 'aws' || github.event.inputs.provider == 'both' || github.event.inputs.provider == null)
     environment: aws-production
     steps:
     - name: 코드 체크아웃
@@ -783,10 +792,10 @@ jobs:
 
   # GCP 프로덕션 배포 (STAGING)
   deploy-gcp-production:
-    name: GCP 프로덕션 배포 (STAGING)
+    name: GCP 배포 (PRODUCTION)
     runs-on: ubuntu-latest
     needs: [build-and-push, security-scan]
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/day2-advanced' || github.event.inputs.environment == 'production'
+    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/day2-advanced' || github.event.inputs.environment == 'production') && (github.event.inputs.provider == 'gcp' || github.event.inputs.provider == 'both' || github.event.inputs.provider == null)
     environment: gcp-production
     steps:
     - name: 코드 체크아웃
