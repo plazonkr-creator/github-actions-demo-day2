@@ -1,5 +1,4 @@
 # Day2 실습용 Docker Compose - 개발 환경
-version: '3.8'
 
 services:
   # 메인 애플리케이션

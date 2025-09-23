@@ -1,5 +1,4 @@
 # Day2 실습용 Docker Compose - 프로덕션 환경
-version: '3.8'
 
 services:
   # 메인 애플리케이션
@@ -109,15 +108,17 @@ services:
       - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf
       - ./nginx/ssl:/etc/nginx/ssl
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     networks:
       - app-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 60s
     deploy:
       resources:
         limits:

@@ -417,26 +417,62 @@ jobs:
           export REDIS_PASSWORD="${{ secrets.PROD_REDIS_PASSWORD }}"
           
           # Docker Compose로 서비스 시작
+          echo "🚀 Docker Compose로 서비스 시작 중..."
           docker-compose -f docker-compose.prod.yml up -d
           
           # 서비스 시작 대기
           echo "⏳ 서비스 시작을 기다리는 중..."
           sleep 30
           
-          # 헬스체크 (여러 번 시도)
-          echo "🏥 헬스체크 시작..."
-          for i in {1..10}; do
-            echo "헬스체크 시도 $i/10..."
-            if curl -f http://localhost/health; then
-              echo "✅ 헬스체크 성공!"
-              break
+          # Docker 서비스 상태 확인
+          echo "🔍 Docker 서비스 상태 확인..."
+          docker-compose -f docker-compose.prod.yml ps
+          
+          # 모든 서비스가 healthy 상태가 될 때까지 대기
+          echo "🏥 서비스 헬스체크 대기 중..."
+          for i in {1..20}; do
+            echo "헬스체크 대기 시도 $i/20..."
+            
+            # 모든 서비스 상태 확인
+            if docker-compose -f docker-compose.prod.yml ps | grep -q "unhealthy"; then
+              echo "일부 서비스가 아직 unhealthy 상태입니다..."
+              sleep 15
+              continue
             fi
-            if [ $i -eq 10 ]; then
+            
+            # nginx가 포트 80에서 리스닝하는지 확인
+            if netstat -tlnp 2>/dev/null | grep :80 > /dev/null; then
+              echo "✅ nginx가 포트 80에서 리스닝 중"
+              
+              # 실제 헬스체크 시도
+              if curl -f http://localhost/health 2>/dev/null; then
+                echo "✅ 헬스체크 성공!"
+                break
+              else
+                echo "nginx는 리스닝 중이지만 헬스체크 실패, 재시도 중..."
+                sleep 10
+                continue
+              fi
+            else
+              echo "nginx가 아직 포트 80에서 리스닝하지 않음..."
+              sleep 15
+              continue
+            fi
+            
+            if [ $i -eq 20 ]; then
               echo "❌ 헬스체크 실패 - 서비스 로그 확인"
-              docker-compose -f docker-compose.prod.yml logs
+              echo "Docker 서비스 상태:"
+              docker-compose -f docker-compose.prod.yml ps
+              echo "nginx 로그:"
+              docker-compose -f docker-compose.prod.yml logs nginx
+              echo "app 로그:"
+              docker-compose -f docker-compose.prod.yml logs app
+              echo "postgres 로그:"
+              docker-compose -f docker-compose.prod.yml logs postgres
+              echo "redis 로그:"
+              docker-compose -f docker-compose.prod.yml logs redis
               exit 1
             fi
-            sleep 10
           done
           
           # 배포 알림
@@ -574,17 +610,17 @@ jobs:
     - name: AWS 프로덕션 배포 준비
       uses: appleboy/ssh-action@v1.0.0
       with:
-        host: ${{ secrets.AWS_VM_HOST }}
-        username: ${{ secrets.AWS_VM_USERNAME }}
-        key: ${{ secrets.AWS_VM_SSH_KEY }}
+        host: ${{ secrets.PROD_VM_HOST }}
+        username: ${{ secrets.PROD_VM_USERNAME }}
+        key: ${{ secrets.PROD_VM_SSH_KEY }}
         script: |
           # 환경 변수 설정
-          export DB_PASSWORD="${{ secrets.AWS_DB_PASSWORD }}"
-          export REDIS_PASSWORD="${{ secrets.AWS_REDIS_PASSWORD }}"
+          export DB_PASSWORD="${{ secrets.PROD_DB_PASSWORD }}"
+          export REDIS_PASSWORD="${{ secrets.PROD_REDIS_PASSWORD }}"
           
           # 작업 디렉토리 생성 및 이동
-          mkdir -p /home/${{ secrets.AWS_VM_USERNAME }}/app
-          cd /home/${{ secrets.AWS_VM_USERNAME }}/app
+          mkdir -p /home/${{ secrets.PROD_VM_USERNAME }}/app
+          cd /home/${{ secrets.PROD_VM_USERNAME }}/app
           
           # Blue-Green 배포를 위한 백업
           if [ -f docker-compose.prod.yml ]; then
@@ -602,20 +638,20 @@ jobs:
     - name: 필요한 파일들을 원격 서버에 복사
       uses: appleboy/scp-action@v0.1.4
       with:
-        host: ${{ secrets.AWS_VM_HOST }}
-        username: ${{ secrets.AWS_VM_USERNAME }}
-        key: ${{ secrets.AWS_VM_SSH_KEY }}
+        host: ${{ secrets.PROD_VM_HOST }}
+        username: ${{ secrets.PROD_VM_USERNAME }}
+        key: ${{ secrets.PROD_VM_SSH_KEY }}
         source: "docker-compose.prod.yml,nginx/nginx.prod.conf"
-        target: "/home/${{ secrets.AWS_VM_USERNAME }}/app/"
+        target: "/home/${{ secrets.PROD_VM_USERNAME }}/app/"
         
     - name: nginx 디렉토리 생성 및 설정 파일 배치
       uses: appleboy/ssh-action@v1.0.0
       with:
-        host: ${{ secrets.AWS_VM_HOST }}
-        username: ${{ secrets.AWS_VM_USERNAME }}
-        key: ${{ secrets.AWS_VM_SSH_KEY }}
+        host: ${{ secrets.PROD_VM_HOST }}
+        username: ${{ secrets.PROD_VM_USERNAME }}
+        key: ${{ secrets.PROD_VM_SSH_KEY }}
         script: |
-          cd /home/${{ secrets.AWS_VM_USERNAME }}/app
+          cd /home/${{ secrets.PROD_VM_USERNAME }}/app
           
           # nginx 디렉토리 생성
           mkdir -p nginx
@@ -630,11 +666,11 @@ jobs:
     - name: 데이터베이스 초기화 스크립트 복사
       uses: appleboy/scp-action@v0.1.4
       with:
-        host: ${{ secrets.AWS_VM_HOST }}
-        username: ${{ secrets.AWS_VM_USERNAME }}
-        key: ${{ secrets.AWS_VM_SSH_KEY }}
+        host: ${{ secrets.PROD_VM_HOST }}
+        username: ${{ secrets.PROD_VM_USERNAME }}
+        key: ${{ secrets.PROD_VM_SSH_KEY }}
         source: "database/"
-        target: "/home/${{ secrets.AWS_VM_USERNAME }}/app/"
+        target: "/home/${{ secrets.PROD_VM_USERNAME }}/app/"
         
     - name: AWS 프로덕션 배포 실행
       uses: appleboy/ssh-action@v1.0.0
@@ -646,36 +682,72 @@ jobs:
           cd /home/${{ secrets.AWS_VM_USERNAME }}/app
           
           # 환경 변수 설정
-          export DB_PASSWORD="${{ secrets.AWS_DB_PASSWORD }}"
-          export REDIS_PASSWORD="${{ secrets.AWS_REDIS_PASSWORD }}"
+          export DB_PASSWORD="${{ secrets.PROD_DB_PASSWORD }}"
+          export REDIS_PASSWORD="${{ secrets.PROD_REDIS_PASSWORD }}"
           
           # Docker Compose로 서비스 시작
+          echo "🚀 Docker Compose로 서비스 시작 중..."
           docker-compose -f docker-compose.prod.yml up -d
           
           # 서비스 시작 대기
           echo "⏳ 서비스 시작을 기다리는 중..."
           sleep 30
           
-          # 헬스체크 (여러 번 시도)
-          echo "🏥 헬스체크 시작..."
-          for i in {1..10}; do
-            echo "헬스체크 시도 $i/10..."
-            if curl -f http://localhost/health; then
-              echo "✅ 헬스체크 성공!"
-              break
+          # Docker 서비스 상태 확인
+          echo "🔍 Docker 서비스 상태 확인..."
+          docker-compose -f docker-compose.prod.yml ps
+          
+          # 모든 서비스가 healthy 상태가 될 때까지 대기
+          echo "🏥 서비스 헬스체크 대기 중..."
+          for i in {1..20}; do
+            echo "헬스체크 대기 시도 $i/20..."
+            
+            # 모든 서비스 상태 확인
+            if docker-compose -f docker-compose.prod.yml ps | grep -q "unhealthy"; then
+              echo "일부 서비스가 아직 unhealthy 상태입니다..."
+              sleep 15
+              continue
             fi
-            if [ $i -eq 10 ]; then
+            
+            # nginx가 포트 80에서 리스닝하는지 확인
+            if netstat -tlnp 2>/dev/null | grep :80 > /dev/null; then
+              echo "✅ nginx가 포트 80에서 리스닝 중"
+              
+              # 실제 헬스체크 시도
+              if curl -f http://localhost/health 2>/dev/null; then
+                echo "✅ 헬스체크 성공!"
+                break
+              else
+                echo "nginx는 리스닝 중이지만 헬스체크 실패, 재시도 중..."
+                sleep 10
+                continue
+              fi
+            else
+              echo "nginx가 아직 포트 80에서 리스닝하지 않음..."
+              sleep 15
+              continue
+            fi
+            
+            if [ $i -eq 20 ]; then
               echo "❌ 헬스체크 실패 - 서비스 로그 확인"
-              docker-compose -f docker-compose.prod.yml logs
+              echo "Docker 서비스 상태:"
+              docker-compose -f docker-compose.prod.yml ps
+              echo "nginx 로그:"
+              docker-compose -f docker-compose.prod.yml logs nginx
+              echo "app 로그:"
+              docker-compose -f docker-compose.prod.yml logs app
+              echo "postgres 로그:"
+              docker-compose -f docker-compose.prod.yml logs postgres
+              echo "redis 로그:"
+              docker-compose -f docker-compose.prod.yml logs redis
               exit 1
             fi
-            sleep 10
           done
           
           # 배포 알림
           echo "🚀 AWS Production deployment completed successfully"
-          echo "🌐 Application URL: http://${{ secrets.AWS_VM_HOST }}"
-          echo "📊 Metrics URL: http://${{ secrets.AWS_VM_HOST }}/metrics"
+          echo "🌐 Application URL: http://${{ secrets.PROD_VM_HOST }}"
+          echo "📊 Metrics URL: http://${{ secrets.PROD_VM_HOST }}/metrics"
           
           # 이전 이미지 정리 (7일 이상 된 이미지)
           docker image prune -f --filter "until=168h"
