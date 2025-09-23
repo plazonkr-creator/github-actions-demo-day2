@@ -3,9 +3,9 @@ name: Advanced CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop, feature/* ]
+    branches: [ day2-advanced, develop, feature/* ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ day2-advanced, develop ]
   workflow_dispatch:
     inputs:
       environment:
