@@ -41,9 +41,21 @@ beforeEach(async () => {
 // 모든 테스트 후 정리
 afterAll(async () => {
   try {
+    // 데이터베이스 연결 종료
     await pool.end();
+    
+    // 강제로 프로세스 종료 (Jest가 멈추는 것을 방지)
+    setTimeout(() => {
+      console.log('강제 프로세스 종료');
+      process.exit(0);
+    }, 1000);
+    
   } catch (error) {
     console.warn('데이터베이스 연결 종료 중 오류 발생:', error.message);
+    // 오류가 발생해도 프로세스 종료
+    setTimeout(() => {
+      process.exit(0);
+    }, 1000);
   }
 });
 

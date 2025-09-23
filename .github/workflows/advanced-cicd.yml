@@ -242,6 +242,13 @@ jobs:
           cat app.log 2>/dev/null || echo "애플리케이션 로그 없음"
           exit 1
         }
+        
+        # Jest 프로세스 강제 정리
+        echo "🧹 Jest 프로세스 정리 중..."
+        pkill -f "jest" || echo "Jest 프로세스가 이미 종료되었습니다"
+        pkill -f "node.*test" || echo "테스트 Node.js 프로세스가 이미 종료되었습니다"
+        sleep 2
+        
         echo "✅ 단위 테스트 완료"
       
     - name: 통합 테스트 실행
@@ -256,13 +263,34 @@ jobs:
           cat app.log 2>/dev/null || echo "애플리케이션 로그 없음"
           exit 1
         }
+        
+        # Jest 프로세스 강제 정리
+        echo "🧹 Jest 프로세스 정리 중..."
+        pkill -f "jest" || echo "Jest 프로세스가 이미 종료되었습니다"
+        pkill -f "node.*test" || echo "테스트 Node.js 프로세스가 이미 종료되었습니다"
+        sleep 2
+        
         echo "✅ 통합 테스트 완료"
       
     - name: 애플리케이션 정리
       if: always()
       run: |
         echo "🧹 애플리케이션 정리 중..."
+        
+        # 모든 Node.js 프로세스 강제 종료
         pkill -f "node src/app.js" || echo "애플리케이션 프로세스가 이미 종료되었습니다"
+        pkill -f "jest" || echo "Jest 프로세스가 이미 종료되었습니다"
+        pkill -f "node.*test" || echo "테스트 프로세스가 이미 종료되었습니다"
+        
+        # 강제 종료 후 잠시 대기
+        sleep 3
+        
+        # 남은 프로세스 확인 및 강제 종료
+        if pgrep -f "node" > /dev/null; then
+          echo "⚠️ 남은 Node.js 프로세스 강제 종료 중..."
+          pkill -9 -f "node" || echo "모든 Node.js 프로세스가 종료되었습니다"
+        fi
+        
         echo "✅ 정리 완료"
       
     - name: 테스트 커버리지 업로드
