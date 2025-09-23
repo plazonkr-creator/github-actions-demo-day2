@@ -101,6 +101,11 @@ jobs:
     - name: 의존성 설치
       run: npm ci
       
+    - name: PostgreSQL 클라이언트 설치
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y postgresql-client
+      
     - name: 환경 변수 설정
       run: |
         echo "NODE_ENV=${{ matrix.environment }}" >> $GITHUB_ENV
@@ -115,8 +120,27 @@ jobs:
       
     - name: 데이터베이스 초기화
       run: |
+        echo "🗄️ 데이터베이스 초기화를 시작합니다..."
+        echo "환경 변수 확인:"
+        echo "DB_HOST: $DB_HOST"
+        echo "DB_PORT: $DB_PORT"
+        echo "DB_NAME: $DB_NAME"
+        echo "DB_USER: $DB_USER"
+        echo "NODE_ENV: $NODE_ENV"
+        
+        # 데이터베이스 연결 대기
+        echo "⏳ 데이터베이스 연결을 기다리는 중..."
+        timeout 60 bash -c 'until pg_isready -h localhost -p 5432 -U postgres; do sleep 2; done'
+        
+        # 마이그레이션 실행
+        echo "🔄 데이터베이스 마이그레이션 실행..."
         npm run db:migrate
+        
+        # 시드 데이터 실행
+        echo "🌱 시드 데이터 생성..."
         npm run db:seed
+        
+        echo "✅ 데이터베이스 초기화 완료!"
       
     - name: 단위 테스트 실행
       run: npm run test:unit
