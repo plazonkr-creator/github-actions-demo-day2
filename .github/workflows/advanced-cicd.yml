@@ -60,6 +60,7 @@ jobs:
   test:
     name: 멀티 환경 테스트
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       matrix:
         node-version: [16, 18, 20]
@@ -157,11 +158,61 @@ jobs:
         
         echo "✅ 데이터베이스 초기화 완료!"
       
+    - name: 애플리케이션 시작
+      run: |
+        echo "🚀 애플리케이션을 백그라운드에서 시작합니다..."
+        npm start &
+        APP_PID=$!
+        echo "애플리케이션 PID: $APP_PID"
+        
+        # 애플리케이션이 시작될 때까지 대기
+        echo "⏳ 애플리케이션 시작을 기다리는 중..."
+        timeout 60 bash -c 'until curl -f http://localhost:3000/health; do sleep 2; done' || {
+          echo "❌ 애플리케이션 시작 실패"
+          kill $APP_PID 2>/dev/null || true
+          exit 1
+        }
+        
+        echo "✅ 애플리케이션이 성공적으로 시작되었습니다!"
+      
+    - name: 서비스 상태 확인
+      run: |
+        echo "🔍 서비스 상태 확인 중..."
+        
+        # PostgreSQL 상태 확인
+        echo "📊 PostgreSQL 상태:"
+        PGPASSWORD=password psql -h localhost -p 5432 -U postgres -d myapp_test -c "SELECT version();" || echo "PostgreSQL 연결 실패"
+        
+        # Redis 상태 확인
+        echo "🔴 Redis 상태:"
+        redis-cli -h localhost -p 6379 ping || echo "Redis 연결 실패"
+        
+        # 애플리케이션 헬스체크
+        echo "🏥 애플리케이션 헬스체크:"
+        timeout 30 bash -c 'until curl -f http://localhost:3000/health; do sleep 2; done' || echo "애플리케이션 헬스체크 실패"
+      
     - name: 단위 테스트 실행
-      run: npm run test:unit
+      run: |
+        echo "🧪 단위 테스트 실행 중..."
+        timeout 300 npm run test:unit || {
+          echo "❌ 단위 테스트 실패 또는 타임아웃"
+          exit 1
+        }
       
     - name: 통합 테스트 실행
-      run: npm run test:integration
+      run: |
+        echo "🔗 통합 테스트 실행 중..."
+        timeout 300 npm run test:integration || {
+          echo "❌ 통합 테스트 실패 또는 타임아웃"
+          exit 1
+        }
+      
+    - name: 애플리케이션 정리
+      if: always()
+      run: |
+        echo "🧹 애플리케이션 정리 중..."
+        pkill -f "node src/app.js" || echo "애플리케이션 프로세스가 이미 종료되었습니다"
+        echo "✅ 정리 완료"
       
     - name: 테스트 커버리지 업로드
       uses: codecov/codecov-action@v3
