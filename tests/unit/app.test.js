@@ -75,8 +75,8 @@ describe('Application Unit Tests', () => {
   describe('POST /api/users', () => {
     it('should create a new user', async () => {
       const userData = {
-        username: 'testuser',
-        email: 'test@example.com'
+        username: `testuser_${Date.now()}`,
+        email: `test_${Date.now()}@example.com`
       };
       
       const response = await request(app)
@@ -106,7 +106,7 @@ describe('Application Unit Tests', () => {
     
     it('should return 400 for missing email', async () => {
       const userData = {
-        username: 'testuser'
+        username: `testuser_${Date.now()}`
       };
       
       const response = await request(app)

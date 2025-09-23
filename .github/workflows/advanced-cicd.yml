@@ -204,6 +204,16 @@ jobs:
           exit 1
         fi
       
+    - name: 테스트 데이터 정리
+      run: |
+        echo "🧹 테스트 데이터 정리 중..."
+        PGPASSWORD=password psql -h localhost -p 5432 -U postgres -d myapp_test -c "
+          DELETE FROM system_metrics WHERE metric_name LIKE 'test_%' OR metric_name LIKE '%test%';
+          DELETE FROM app_logs WHERE message LIKE '%test%' OR message LIKE '%Test%';
+          DELETE FROM users WHERE username LIKE '%test%' AND username NOT IN ('admin', 'testuser', 'demo');
+        " || echo "테스트 데이터 정리 완료 (일부 오류 무시)"
+        echo "✅ 테스트 데이터 정리 완료"
+      
     - name: 서비스 상태 확인
       run: |
         echo "🔍 서비스 상태 확인 중..."

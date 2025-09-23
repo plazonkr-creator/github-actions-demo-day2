@@ -8,8 +8,8 @@ describe('Database Integration Tests', () => {
     it('should create, read, and manage users', async () => {
       // 1. 사용자 생성
       const userData = {
-        username: 'integrationtest',
-        email: 'integration@example.com'
+        username: `integrationtest_${Date.now()}`,
+        email: `integration_${Date.now()}@example.com`
       };
       
       const createResponse = await request(app)
@@ -37,9 +37,10 @@ describe('Database Integration Tests', () => {
     });
     
     it('should handle duplicate user creation', async () => {
+      const timestamp = Date.now();
       const userData = {
-        username: 'duplicatetest',
-        email: 'duplicate@example.com'
+        username: `duplicatetest_${timestamp}`,
+        email: `duplicate_${timestamp}@example.com`
       };
       
       // 첫 번째 사용자 생성
