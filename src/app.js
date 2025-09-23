@@ -517,6 +517,9 @@ process.on('SIGINT', async () => {
   }
 });
 
-startServer();
+// 테스트 환경이 아닐 때만 서버 시작
+if (process.env.NODE_ENV !== 'test') {
+  startServer();
+}
 
 module.exports = app;

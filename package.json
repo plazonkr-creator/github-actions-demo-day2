@@ -64,7 +64,6 @@
     "verbose": false,
     "forceExit": true,
     "maxWorkers": 1,
-    "runInBand": true,
     "clearMocks": true,
     "restoreMocks": true,
     "resetMocks": true

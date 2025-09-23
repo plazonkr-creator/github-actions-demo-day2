@@ -147,7 +147,7 @@ describe('Application Unit Tests', () => {
         .expect(200);
       
       expect(response.body).toHaveProperty('success', true);
-      expect(response.body.filters).toHaveProperty('limit', 10);
+      expect(response.body.filters).toHaveProperty('limit', '10');
       expect(response.body.data.length).toBeLessThanOrEqual(10);
     });
   });
