@@ -1,6 +1,20 @@
 -- Day2 실습용 데이터베이스 초기화 스크립트
 -- PostgreSQL 데이터베이스 스키마 및 초기 데이터
 
+-- 데이터베이스 사용자 역할 생성
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'myapp_user') THEN
+        CREATE ROLE myapp_user WITH LOGIN PASSWORD 'password';
+    END IF;
+END
+$$;
+
+-- 데이터베이스 권한 설정
+GRANT CONNECT ON DATABASE myapp_test TO myapp_user;
+GRANT USAGE ON SCHEMA public TO myapp_user;
+GRANT CREATE ON SCHEMA public TO myapp_user;
+
 -- 사용자 테이블
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,

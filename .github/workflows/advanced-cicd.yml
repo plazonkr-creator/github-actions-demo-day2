@@ -132,6 +132,21 @@ jobs:
         echo "⏳ 데이터베이스 연결을 기다리는 중..."
         timeout 60 bash -c 'until pg_isready -h localhost -p 5432 -U postgres; do sleep 2; done'
         
+        # 데이터베이스 사용자 역할 생성
+        echo "👤 데이터베이스 사용자 역할 생성..."
+        PGPASSWORD=password psql -h localhost -p 5432 -U postgres -d myapp_test -c "
+          DO \$\$
+          BEGIN
+              IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'myapp_user') THEN
+                  CREATE ROLE myapp_user WITH LOGIN PASSWORD 'password';
+              END IF;
+          END
+          \$\$;
+          GRANT CONNECT ON DATABASE myapp_test TO myapp_user;
+          GRANT USAGE ON SCHEMA public TO myapp_user;
+          GRANT CREATE ON SCHEMA public TO myapp_user;
+        " || echo "⚠️ 사용자 역할 생성 중 오류 발생 (이미 존재할 수 있음)"
+        
         # 마이그레이션 실행
         echo "🔄 데이터베이스 마이그레이션 실행..."
         npm run db:migrate
