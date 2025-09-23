@@ -349,6 +349,7 @@ jobs:
           # 환경 변수 설정
           export DB_PASSWORD="${{ secrets.PROD_DB_PASSWORD }}"
           export REDIS_PASSWORD="${{ secrets.PROD_REDIS_PASSWORD }}"
+          export CONTAINER_PREFIX="aws-vm-prod"
           
           # 작업 디렉토리 생성 및 이동
           mkdir -p /home/${{ secrets.PROD_VM_USERNAME }}/app
@@ -415,6 +416,7 @@ jobs:
           # 환경 변수 설정
           export DB_PASSWORD="${{ secrets.PROD_DB_PASSWORD }}"
           export REDIS_PASSWORD="${{ secrets.PROD_REDIS_PASSWORD }}"
+          export CONTAINER_PREFIX="aws-vm-prod"
           
           # Docker Compose로 서비스 시작
           echo "🚀 Docker Compose로 서비스 시작 중..."
@@ -567,6 +569,7 @@ jobs:
           # 환경 변수 설정
           export DB_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}"
           export REDIS_PASSWORD="${{ secrets.STAGING_REDIS_PASSWORD }}"
+          export CONTAINER_PREFIX="gcp-staging"
           
           # Docker Compose로 서비스 시작
           docker-compose -f docker-compose.prod.yml up -d
@@ -617,6 +620,7 @@ jobs:
           # 환경 변수 설정
           export DB_PASSWORD="${{ secrets.PROD_DB_PASSWORD }}"
           export REDIS_PASSWORD="${{ secrets.PROD_REDIS_PASSWORD }}"
+          export CONTAINER_PREFIX="aws-vm-prod"
           
           # 작업 디렉토리 생성 및 이동
           mkdir -p /home/${{ secrets.PROD_VM_USERNAME }}/app
@@ -684,6 +688,7 @@ jobs:
           # 환경 변수 설정
           export DB_PASSWORD="${{ secrets.PROD_DB_PASSWORD }}"
           export REDIS_PASSWORD="${{ secrets.PROD_REDIS_PASSWORD }}"
+          export CONTAINER_PREFIX="aws-production"
           
           # Docker Compose로 서비스 시작
           echo "🚀 Docker Compose로 서비스 시작 중..."
@@ -840,6 +845,7 @@ jobs:
           # 환경 변수 설정
           export DB_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}"
           export REDIS_PASSWORD="${{ secrets.STAGING_REDIS_PASSWORD }}"
+          export CONTAINER_PREFIX="gcp-production"
           
           # Docker Compose로 서비스 시작
           docker-compose -f docker-compose.prod.yml up -d
