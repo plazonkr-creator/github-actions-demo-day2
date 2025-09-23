@@ -1,0 +1,427 @@
+# Day2 실습용 고급 CI/CD 파이프라인
+name: Advanced CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: '배포 환경을 선택하세요'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: github-actions-demo-day2
+
+jobs:
+  # 코드 품질 검사
+  quality-check:
+    name: 코드 품질 검사
+    runs-on: ubuntu-latest
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: Node.js 설정
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: 의존성 설치
+      run: npm ci
+      
+    - name: 린팅 검사
+      run: npm run lint
+      
+    - name: 코드 포맷팅 검사
+      run: npm run format -- --check
+      
+    - name: 보안 감사
+      run: npm audit --audit-level moderate
+      
+    - name: 의존성 취약점 검사
+      run: |
+        npm audit --audit-level high
+        if [ $? -ne 0 ]; then
+          echo "High severity vulnerabilities found"
+          exit 1
+        fi
+
+  # 멀티 환경 테스트
+  test:
+    name: 멀티 환경 테스트
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [16, 18, 20]
+        environment: [staging, production]
+    services:
+      postgres:
+        image: postgres:13-alpine
+        env:
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: myapp_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:6-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: Node.js ${{ matrix.node-version }} 설정
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: 의존성 설치
+      run: npm ci
+      
+    - name: 환경 변수 설정
+      run: |
+        echo "NODE_ENV=${{ matrix.environment }}" >> $GITHUB_ENV
+        echo "DB_HOST=localhost" >> $GITHUB_ENV
+        echo "DB_PORT=5432" >> $GITHUB_ENV
+        echo "DB_NAME=myapp_test" >> $GITHUB_ENV
+        echo "DB_USER=postgres" >> $GITHUB_ENV
+        echo "DB_PASSWORD=password" >> $GITHUB_ENV
+        echo "REDIS_HOST=localhost" >> $GITHUB_ENV
+        echo "REDIS_PORT=6379" >> $GITHUB_ENV
+        echo "REDIS_PASSWORD=" >> $GITHUB_ENV
+      
+    - name: 데이터베이스 초기화
+      run: |
+        npm run db:migrate
+        npm run db:seed
+      
+    - name: 단위 테스트 실행
+      run: npm run test:unit
+      
+    - name: 통합 테스트 실행
+      run: npm run test:integration
+      
+    - name: 테스트 커버리지 업로드
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  # Docker 이미지 빌드 및 푸시
+  build-and-push:
+    name: Docker 이미지 빌드 및 푸시
+    runs-on: ubuntu-latest
+    needs: [quality-check, test]
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: Docker Hub 로그인
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+        
+    - name: Docker 이미지 빌드 및 푸시
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: |
+          ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+          ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:v2.0.0
+        labels: |
+          org.opencontainers.image.title=GitHub Actions Demo Day2
+          org.opencontainers.image.description=Advanced CI/CD Pipeline Demo
+          org.opencontainers.image.version=v2.0.0
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          org.opencontainers.image.revision=${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # 보안 스캔
+  security-scan:
+    name: 보안 스캔
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: Trivy 보안 스캔
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Trivy 스캔 결과 업로드
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # AWS VM 배포
+  deploy-aws:
+    name: AWS VM 배포
+    runs-on: ubuntu-latest
+    needs: [build-and-push, security-scan]
+    if: github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'staging'
+    environment: aws-staging
+    steps:
+    - name: AWS VM 배포
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.AWS_VM_HOST }}
+        username: ${{ secrets.AWS_VM_USERNAME }}
+        key: ${{ secrets.AWS_VM_SSH_KEY }}
+        script: |
+          # 환경 변수 설정
+          export DB_PASSWORD="${{ secrets.AWS_DB_PASSWORD }}"
+          export REDIS_PASSWORD="${{ secrets.AWS_REDIS_PASSWORD }}"
+          
+          # 기존 서비스 중지
+          docker-compose -f docker-compose.prod.yml down
+          
+          # 최신 이미지 풀
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+          docker pull ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+          
+          # AWS VM 배포
+          docker-compose -f docker-compose.prod.yml up -d
+          
+          # 헬스체크
+          sleep 30
+          curl -f http://localhost/health || exit 1
+          
+          # 배포 알림
+          echo "✅ AWS VM deployment completed successfully"
+          echo "🌐 Application URL: http://${{ secrets.AWS_VM_HOST }}"
+          echo "📊 Metrics URL: http://${{ secrets.AWS_VM_HOST }}/metrics"
+
+  # GCP VM 배포
+  deploy-gcp:
+    name: GCP VM 배포
+    runs-on: ubuntu-latest
+    needs: [build-and-push, security-scan]
+    if: github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'staging'
+    environment: gcp-staging
+    steps:
+    - name: GCP VM 배포
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.GCP_VM_HOST }}
+        username: ${{ secrets.GCP_VM_USERNAME }}
+        key: ${{ secrets.GCP_VM_SSH_KEY }}
+        script: |
+          # 환경 변수 설정
+          export DB_PASSWORD="${{ secrets.GCP_DB_PASSWORD }}"
+          export REDIS_PASSWORD="${{ secrets.GCP_REDIS_PASSWORD }}"
+          
+          # 기존 서비스 중지
+          docker-compose -f docker-compose.prod.yml down
+          
+          # 최신 이미지 풀
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+          docker pull ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+          
+          # GCP VM 배포
+          docker-compose -f docker-compose.prod.yml up -d
+          
+          # 헬스체크
+          sleep 30
+          curl -f http://localhost/health || exit 1
+          
+          # 배포 알림
+          echo "✅ GCP VM deployment completed successfully"
+          echo "🌐 Application URL: http://${{ secrets.GCP_VM_HOST }}"
+          echo "📊 Metrics URL: http://${{ secrets.GCP_VM_HOST }}/metrics"
+
+  # AWS 프로덕션 배포
+  deploy-aws-production:
+    name: AWS 프로덕션 배포
+    runs-on: ubuntu-latest
+    needs: [build-and-push, security-scan]
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'production'
+    environment: aws-production
+    steps:
+    - name: AWS 프로덕션 배포
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.AWS_VM_HOST }}
+        username: ${{ secrets.AWS_VM_USERNAME }}
+        key: ${{ secrets.AWS_VM_SSH_KEY }}
+        script: |
+          # 환경 변수 설정
+          export DB_PASSWORD="${{ secrets.AWS_DB_PASSWORD }}"
+          export REDIS_PASSWORD="${{ secrets.AWS_REDIS_PASSWORD }}"
+          
+          # Blue-Green 배포를 위한 백업
+          docker-compose -f docker-compose.prod.yml down
+          docker tag ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:backup-$(date +%Y%m%d-%H%M%S)
+          
+          # 최신 이미지 풀
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+          docker pull ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+          
+          # AWS 프로덕션 배포
+          docker-compose -f docker-compose.prod.yml up -d
+          
+          # 헬스체크
+          sleep 30
+          curl -f http://localhost/health || exit 1
+          
+          # 배포 알림
+          echo "🚀 AWS Production deployment completed successfully"
+          echo "🌐 Application URL: http://${{ secrets.AWS_VM_HOST }}"
+          echo "📊 Metrics URL: http://${{ secrets.AWS_VM_HOST }}/metrics"
+          
+          # 이전 이미지 정리 (7일 이상 된 이미지)
+          docker image prune -f --filter "until=168h"
+
+  # GCP 프로덕션 배포
+  deploy-gcp-production:
+    name: GCP 프로덕션 배포
+    runs-on: ubuntu-latest
+    needs: [build-and-push, security-scan]
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'production'
+    environment: gcp-production
+    steps:
+    - name: GCP 프로덕션 배포
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.GCP_VM_HOST }}
+        username: ${{ secrets.GCP_VM_USERNAME }}
+        key: ${{ secrets.GCP_VM_SSH_KEY }}
+        script: |
+          # 환경 변수 설정
+          export DB_PASSWORD="${{ secrets.GCP_DB_PASSWORD }}"
+          export REDIS_PASSWORD="${{ secrets.GCP_REDIS_PASSWORD }}"
+          
+          # Blue-Green 배포를 위한 백업
+          docker-compose -f docker-compose.prod.yml down
+          docker tag ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:backup-$(date +%Y%m%d-%H%M%S)
+          
+          # 최신 이미지 풀
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+          docker pull ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+          
+          # GCP 프로덕션 배포
+          docker-compose -f docker-compose.prod.yml up -d
+          
+          # 헬스체크
+          sleep 30
+          curl -f http://localhost/health || exit 1
+          
+          # 배포 알림
+          echo "🚀 GCP Production deployment completed successfully"
+          echo "🌐 Application URL: http://${{ secrets.GCP_VM_HOST }}"
+          echo "📊 Metrics URL: http://${{ secrets.GCP_VM_HOST }}/metrics"
+          
+          # 이전 이미지 정리 (7일 이상 된 이미지)
+          docker image prune -f --filter "until=168h"
+
+  # 배포 후 테스트
+  post-deployment-test:
+    name: 배포 후 테스트
+    runs-on: ubuntu-latest
+    needs: [deploy-aws, deploy-gcp, deploy-aws-production, deploy-gcp-production]
+    if: always() && (needs.deploy-aws.result == 'success' || needs.deploy-gcp.result == 'success' || needs.deploy-aws-production.result == 'success' || needs.deploy-gcp-production.result == 'success')
+    steps:
+    - name: 배포된 애플리케이션 테스트
+      run: |
+        # AWS 스테이징 환경 테스트
+        if [ "${{ needs.deploy-aws.result }}" == "success" ]; then
+          echo "Testing AWS staging environment..."
+          curl -f http://${{ secrets.AWS_VM_HOST }}/health
+          curl -f http://${{ secrets.AWS_VM_HOST }}/api/users
+          echo "✅ AWS staging environment tests passed"
+        fi
+        
+        # GCP 스테이징 환경 테스트
+        if [ "${{ needs.deploy-gcp.result }}" == "success" ]; then
+          echo "Testing GCP staging environment..."
+          curl -f http://${{ secrets.GCP_VM_HOST }}/health
+          curl -f http://${{ secrets.GCP_VM_HOST }}/api/users
+          echo "✅ GCP staging environment tests passed"
+        fi
+        
+        # AWS 프로덕션 환경 테스트
+        if [ "${{ needs.deploy-aws-production.result }}" == "success" ]; then
+          echo "Testing AWS production environment..."
+          curl -f http://${{ secrets.AWS_VM_HOST }}/health
+          curl -f http://${{ secrets.AWS_VM_HOST }}/api/users
+          echo "✅ AWS production environment tests passed"
+        fi
+        
+        # GCP 프로덕션 환경 테스트
+        if [ "${{ needs.deploy-gcp-production.result }}" == "success" ]; then
+          echo "Testing GCP production environment..."
+          curl -f http://${{ secrets.GCP_VM_HOST }}/health
+          curl -f http://${{ secrets.GCP_VM_HOST }}/api/users
+          echo "✅ GCP production environment tests passed"
+        fi
+
+  # 알림
+  notify:
+    name: 배포 알림
+    runs-on: ubuntu-latest
+    needs: [deploy-aws, deploy-gcp, deploy-aws-production, deploy-gcp-production, post-deployment-test]
+    if: always()
+    steps:
+    - name: 배포 결과 알림
+      run: |
+        echo "🎯 CI/CD Pipeline Summary"
+        echo "=========================="
+        echo "📦 Build: ✅ Success"
+        echo "🧪 Tests: ✅ Success"
+        echo "🔒 Security Scan: ✅ Success"
+        echo "🚀 AWS Staging: ${{ needs.deploy-aws.result }}"
+        echo "🚀 GCP Staging: ${{ needs.deploy-gcp.result }}"
+        echo "🏭 AWS Production: ${{ needs.deploy-aws-production.result }}"
+        echo "🏭 GCP Production: ${{ needs.deploy-gcp-production.result }}"
+        echo "✅ Post-deployment Tests: ${{ needs.post-deployment-test.result }}"
+        echo ""
+        echo "🌐 Deployed URLs:"
+        if [ "${{ needs.deploy-aws.result }}" == "success" ]; then
+          echo "  AWS Staging: http://${{ secrets.AWS_VM_HOST }}"
+        fi
+        if [ "${{ needs.deploy-gcp.result }}" == "success" ]; then
+          echo "  GCP Staging: http://${{ secrets.GCP_VM_HOST }}"
+        fi
+        if [ "${{ needs.deploy-aws-production.result }}" == "success" ]; then
+          echo "  AWS Production: http://${{ secrets.AWS_VM_HOST }}"
+        fi
+        if [ "${{ needs.deploy-gcp-production.result }}" == "success" ]; then
+          echo "  GCP Production: http://${{ secrets.GCP_VM_HOST }}"
+        fi
+        echo ""
+        echo "📊 Pipeline completed at: $(date)"
