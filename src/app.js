@@ -136,9 +136,14 @@ app.get('/health', async (req, res) => {
   };
 
   try {
-    // 데이터베이스 연결 확인
+    // 데이터베이스 연결 확인 (타임아웃 설정)
     const dbStart = Date.now();
-    await pool.query('SELECT 1');
+    const dbPromise = pool.query('SELECT 1');
+    const dbTimeout = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Database timeout')), 5000)
+    );
+    
+    await Promise.race([dbPromise, dbTimeout]);
     const dbDuration = Date.now() - dbStart;
     
     healthCheck.checks.database = {
@@ -146,16 +151,29 @@ app.get('/health', async (req, res) => {
       responseTime: `${dbDuration}ms`
     };
     
-    // Redis 연결 확인
+    // Redis 연결 확인 (타임아웃 설정)
     if (redisClient) {
-      const redisStart = Date.now();
-      await redisClient.ping();
-      const redisDuration = Date.now() - redisStart;
-      
-      healthCheck.checks.redis = {
-        status: 'connected',
-        responseTime: `${redisDuration}ms`
-      };
+      try {
+        const redisStart = Date.now();
+        const redisPromise = redisClient.ping();
+        const redisTimeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Redis timeout')), 3000)
+        );
+        
+        await Promise.race([redisPromise, redisTimeout]);
+        const redisDuration = Date.now() - redisStart;
+        
+        healthCheck.checks.redis = {
+          status: 'connected',
+          responseTime: `${redisDuration}ms`
+        };
+      } catch (redisError) {
+        healthCheck.checks.redis = {
+          status: 'error',
+          error: redisError.message
+        };
+        // Redis 오류는 전체 헬스체크를 실패시키지 않음
+      }
     } else {
       healthCheck.checks.redis = {
         status: 'not_configured',
@@ -173,7 +191,7 @@ app.get('/health', async (req, res) => {
     };
     
     logger.info('Health check passed', healthCheck);
-    res.json(healthCheck);
+    res.status(200).json(healthCheck);
     
   } catch (error) {
     logger.error('Health check failed:', error);

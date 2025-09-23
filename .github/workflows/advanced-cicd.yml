@@ -1020,12 +1020,12 @@ jobs:
     steps:
     - name: 배포된 애플리케이션 테스트
       run: |
-        # AWS 프로덕션 환경 테스트
+        # AWS 스테이징 환경 테스트
         if [ "${{ needs.deploy-aws.result }}" == "success" ]; then
-          echo "Testing AWS production environment..."
-          curl -f http://${{ secrets.PROD_VM_HOST }}/health
-          curl -f http://${{ secrets.PROD_VM_HOST }}/api/users
-          echo "✅ AWS production environment tests passed"
+          echo "Testing AWS staging environment..."
+          curl -f http://${{ secrets.STAGING_VM_HOST }}/health
+          curl -f http://${{ secrets.STAGING_VM_HOST }}/api/users
+          echo "✅ AWS staging environment tests passed"
         fi
         
         # GCP 스테이징 환경 테스트
@@ -1047,8 +1047,8 @@ jobs:
         # GCP 프로덕션 환경 테스트
         if [ "${{ needs.deploy-gcp-production.result }}" == "success" ]; then
           echo "Testing GCP production environment..."
-          curl -f http://${{ secrets.STAGING_VM_HOST }}/health
-          curl -f http://${{ secrets.STAGING_VM_HOST }}/api/users
+          curl -f http://${{ secrets.PROD_VM_HOST }}/health
+          curl -f http://${{ secrets.PROD_VM_HOST }}/api/users
           echo "✅ GCP production environment tests passed"
         fi
 
