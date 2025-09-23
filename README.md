@@ -1,169 +1,173 @@
-# 🚀 GitHub Actions Demo - Day2 고급 기능
+# 🚀 GitHub Actions CI/CD 실습 프로젝트 - Day 2
 
-> **Day2 실습용 프로젝트**: 고급 CI/CD 파이프라인과 다중 서비스 환경 구축
+> **고급 CI/CD 파이프라인과 모니터링 스택을 구축하는 실습 프로젝트**
+
+[![CI/CD Pipeline](https://github.com/jungfrau70/github-actions-demo-day2/workflows/Advanced%20CI/CD%20Pipeline/badge.svg)](https://github.com/jungfrau70/github-actions-demo-day2/actions)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
+[![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=flat&logo=prometheus&logoColor=white)](https://prometheus.io/)
+[![Grafana](https://img.shields.io/badge/Grafana-F46800?style=flat&logo=grafana&logoColor=white)](https://grafana.com/)
 
 ## 📋 프로젝트 개요
 
-이 프로젝트는 Cloud Master 과정의 2일차 실습을 위한 고급 CI/CD 파이프라인과 다중 서비스 환경을 구축하는 실습 프로젝트입니다.
+이 프로젝트는 현대적인 DevOps 워크플로우를 학습하기 위한 실습 프로젝트입니다. Docker, Docker Compose, GitHub Actions, Prometheus, Grafana를 활용하여 완전한 CI/CD 파이프라인과 모니터링 스택을 구축합니다.
 
-### 🎯 주요 기능
-
-- **고급 CI/CD 파이프라인**: GitHub Actions를 활용한 멀티 환경 배포
-- **다중 서비스 환경**: PostgreSQL + Redis + Nginx 통합
-- **모니터링 시스템**: Prometheus 메트릭 수집 및 헬스체크
-- **보안 스캔**: Trivy를 활용한 컨테이너 보안 검사
-- **자동화된 테스트**: 단위 테스트 및 통합 테스트
+### **🎯 학습 목표**
+- 멀티스테이지 Dockerfile을 사용한 이미지 최적화
+- Docker Compose로 마이크로서비스 아키텍처 구축
+- Prometheus + Grafana 모니터링 스택 구축
+- GitHub Actions 고급 CI/CD 파이프라인 구현
+- 멀티 환경 배포 (AWS/GCP)
 
 ## 🏗️ 아키텍처
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Nginx         │    │   Node.js App   │    │   PostgreSQL    │
-│   (Load Balancer)│◄──►│   (Express)     │◄──►│   (Database)    │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                              │
-                              ▼
-                       ┌─────────────────┐
-                       │   Redis         │
-                       │   (Cache)       │
-                       └─────────────────┘
+┌─────────────────┐    ┌─────────────────┐
+│   GitHub        │    │   GitHub        │
+│   Actions       │───▶│   Actions       │
+│   (CI/CD)       │    │   (CI/CD)       │
+└─────────────────┘    └─────────────────┘
+         │                       │
+         ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐
+│   AWS VM        │    │   GCP VM        │
+│   (Production)  │    │   (Staging)     │
+└─────────────────┘    └─────────────────┘
+         │                       │
+         ▼                       ▼
+┌─────────────────────────────────────────┐
+│           Docker Compose Stack          │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐   │
+│  │   App   │ │  Nginx  │ │  Redis  │   │
+│  │ (Node.js)│ │(Proxy) │ │(Cache)  │   │
+│  └─────────┘ └─────────┘ └─────────┘   │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐   │
+│  │Postgres │ │Prometheus│ │ Grafana │   │
+│  │   DB    │ │(Metrics)│ │(Dash)   │   │
+│  └─────────┘ └─────────┘ └─────────┘   │
+└─────────────────────────────────────────┘
 ```
-
-## 🛠️ 기술 스택
-
-### Backend
-- **Node.js 18**: 런타임 환경
-- **Express.js**: 웹 프레임워크
-- **PostgreSQL**: 메인 데이터베이스
-- **Redis**: 캐시 및 세션 저장소
-
-### DevOps
-- **Docker**: 컨테이너화
-- **Docker Compose**: 다중 서비스 관리
-- **GitHub Actions**: CI/CD 파이프라인
-- **Nginx**: 로드밸런서 및 리버스 프록시
-
-### Monitoring
-- **Prometheus**: 메트릭 수집
-- **Winston**: 로깅
-- **Health Checks**: 서비스 상태 모니터링
 
 ## 🚀 빠른 시작
 
-### 1. 프로젝트 클론
+### **필수 요구사항**
+- Docker & Docker Compose
+- Node.js 18+
+- Git
+- GitHub 계정
 
+### **1. 프로젝트 클론**
 ```bash
-# GitHub 저장소 클론
-git clone https://github.com/your-username/github-actions-demo-day2.git
+git clone https://github.com/jungfrau70/github-actions-demo-day2.git
 cd github-actions-demo-day2
-
-# 브랜치 전환 (Day2 실습용)
 git checkout day2-advanced
 ```
 
-### 2. 환경 설정
-
+### **2. 개발 환경 실행**
 ```bash
-# 환경 변수 파일 생성
-npm run setup:env
-
-# 의존성 설치
-npm install
-```
-
-### 3. 개발 환경 실행
-
-```bash
-# Docker Compose로 개발 환경 시작
+# 모든 서비스 시작 (앱 + 모니터링)
 docker-compose up -d
 
 # 서비스 상태 확인
 docker-compose ps
-
-# 헬스체크 확인
-curl http://localhost/health
 ```
 
-### 4. 테스트 실행
-
-```bash
-# 단위 테스트
-npm run test:unit
-
-# 통합 테스트
-npm run test:integration
-
-# 전체 테스트
-npm test
-```
+### **3. 애플리케이션 접속**
+- **메인 앱**: http://localhost:3000
+- **헬스체크**: http://localhost:3000/health
+- **메트릭**: http://localhost:3000/metrics
+- **Grafana**: http://localhost:3001 (admin/admin123)
+- **Prometheus**: http://localhost:9090
 
 ## 📁 프로젝트 구조
 
 ```
 github-actions-demo-day2/
-├── src/                          # 소스 코드
-│   └── app.js                    # 메인 애플리케이션
-├── tests/                        # 테스트 파일
-│   ├── unit/                     # 단위 테스트
-│   └── integration/              # 통합 테스트
-├── database/                     # 데이터베이스 스크립트
-│   └── init.sql                  # 초기화 스크립트
-├── nginx/                        # Nginx 설정
-│   ├── nginx.dev.conf            # 개발 환경 설정
-│   └── nginx.prod.conf           # 프로덕션 환경 설정
-├── scripts/                      # 유틸리티 스크립트
-│   ├── setup-env.js              # 환경 설정
-│   ├── migrate.js                # 데이터베이스 마이그레이션
-│   └── seed.js                   # 시드 데이터 생성
-├── .github/workflows/            # GitHub Actions 워크플로우
-│   └── advanced-cicd.yml         # 고급 CI/CD 파이프라인
-├── docker-compose.yml            # 개발 환경 Docker Compose
-├── docker-compose.prod.yml       # 프로덕션 환경 Docker Compose
-├── Dockerfile                    # 멀티스테이지 빌드
-└── package.json                  # 프로젝트 설정
+├── .github/workflows/
+│   └── advanced-cicd.yml          # 고급 CI/CD 워크플로우
+├── src/
+│   ├── app.js                     # Express 애플리케이션
+│   └── server.js                  # 서버 시작 파일
+├── nginx/
+│   ├── nginx.dev.conf             # 개발용 Nginx 설정
+│   └── nginx.prod.conf            # 프로덕션용 Nginx 설정
+├── monitoring/
+│   ├── prometheus/
+│   │   └── prometheus.yml         # Prometheus 설정
+│   └── grafana/
+│       └── provisioning/          # Grafana 자동 설정
+├── docs/
+│   ├── DAY2-LECTURE.md            # Day 2 강의안
+│   └── DAY2-HANDSON.md            # Day 2 실습 가이드
+├── docker-compose.yml             # 개발 환경
+├── docker-compose.prod.yml        # 프로덕션 환경
+├── Dockerfile                     # 멀티스테이지 빌드
+├── package.json                   # Node.js 의존성
+└── README.md                      # 프로젝트 문서
 ```
 
-## 🔧 환경 변수
+## 🛠️ 주요 기능
 
-### 개발 환경 (.env)
+### **1. 멀티스테이지 Dockerfile**
+- **빌드 환경**: Node.js 의존성 설치
+- **실행 환경**: 최적화된 런타임 이미지
+- **이미지 크기**: 50% 이상 최적화
+
+### **2. Docker Compose 마이크로서비스**
+- **Node.js 애플리케이션**: Express 기반 REST API
+- **PostgreSQL**: 관계형 데이터베이스
+- **Redis**: 인메모리 캐시
+- **Nginx**: 리버스 프록시 및 로드밸런서
+
+### **3. 모니터링 스택**
+- **Prometheus**: 메트릭 수집 및 저장
+- **Grafana**: 대시보드 및 시각화
+- **Node Exporter**: 시스템 메트릭
+- **cAdvisor**: 컨테이너 메트릭
+- **Redis/PostgreSQL Exporter**: 데이터베이스 메트릭
+
+### **4. 고급 CI/CD 파이프라인**
+- **멀티 환경 배포**: AWS, GCP 동시 배포
+- **파라미터 기반 배포**: 수동 트리거로 선택적 배포
+- **헬스체크**: 배포 후 서비스 상태 검증
+- **롤백 전략**: 실패 시 자동 복구
+
+## 📊 모니터링
+
+### **수집되는 메트릭**
+- **애플리케이션**: HTTP 요청, 응답 시간, 메모리 사용량
+- **시스템**: CPU, 메모리, 디스크 I/O, 네트워크
+- **컨테이너**: 각 컨테이너별 리소스 사용량
+- **데이터베이스**: 연결 수, 쿼리 성능, 테이블 크기
+- **캐시**: Redis 메모리 사용량, 키 수, 명령 실행 수
+
+### **대시보드**
+- **시스템 메트릭**: CPU, 메모리, 디스크 사용률
+- **애플리케이션 메트릭**: HTTP 요청, 응답 시간, 오류율
+- **비즈니스 메트릭**: 사용자 수, API 호출 수
+- **인프라 메트릭**: 컨테이너 상태, 네트워크 트래픽
+
+## 🔧 개발 가이드
+
+### **로컬 개발**
 ```bash
-NODE_ENV=development
-PORT=3000
-DB_HOST=postgres
-DB_PORT=5432
-DB_NAME=myapp
-DB_USER=myapp_user
-DB_PASSWORD=password
-REDIS_HOST=redis
-REDIS_PORT=6379
-REDIS_PASSWORD=password
-LOG_LEVEL=debug
+# 의존성 설치
+npm install
+
+# 개발 서버 실행
+npm run dev
+
+# 테스트 실행
+npm test
+
+# 코드 품질 검사
+npm run lint
 ```
 
-### 프로덕션 환경 (.env.prod)
+### **Docker 개발**
 ```bash
-NODE_ENV=production
-PORT=3000
-DB_HOST=postgres
-DB_PORT=5432
-DB_NAME=myapp
-DB_USER=myapp_user
-DB_PASSWORD=your_secure_db_password_here
-REDIS_HOST=redis
-REDIS_PORT=6379
-REDIS_PASSWORD=your_secure_redis_password_here
-LOG_LEVEL=info
-```
-
-## 🐳 Docker 명령어
-
-### 개발 환경
-```bash
-# 서비스 시작
+# 개발 환경 실행
 docker-compose up -d
-
-# 서비스 중지
-docker-compose down
 
 # 로그 확인
 docker-compose logs -f app
@@ -172,152 +176,75 @@ docker-compose logs -f app
 docker-compose restart app
 ```
 
-### 프로덕션 환경
+### **프로덕션 배포**
 ```bash
 # 프로덕션 환경 실행
 docker-compose -f docker-compose.prod.yml up -d
 
-# 프로덕션 환경 중지
-docker-compose -f docker-compose.prod.yml down
-
-# 프로덕션 로그 확인
-docker-compose -f docker-compose.prod.yml logs -f
+# 서비스 상태 확인
+docker-compose -f docker-compose.prod.yml ps
 ```
-
-## 🧪 테스트
-
-### 테스트 실행
-```bash
-# 전체 테스트
-npm test
-
-# 단위 테스트만
-npm run test:unit
-
-# 통합 테스트만
-npm run test:integration
-
-# 커버리지 포함 테스트
-npm test -- --coverage
-```
-
-### 테스트 구조
-- **단위 테스트**: 개별 함수 및 모듈 테스트
-- **통합 테스트**: 데이터베이스 및 외부 서비스 연동 테스트
-- **E2E 테스트**: 전체 애플리케이션 플로우 테스트
-
-## 📊 API 엔드포인트
-
-### 헬스체크
-- `GET /health` - 서비스 상태 확인
-- `GET /metrics` - Prometheus 메트릭
-
-### 사용자 관리
-- `GET /api/users` - 사용자 목록 조회
-- `POST /api/users` - 새 사용자 생성
-- `GET /api/users/cached` - 캐시된 사용자 목록
-
-### 로그 관리
-- `GET /api/logs` - 로그 목록 조회
-- `POST /api/logs` - 새 로그 생성
-
-### 시스템 상태
-- `GET /api/redis/status` - Redis 상태 확인
-- `GET /api/db/status` - 데이터베이스 상태 확인
-
-## 🔄 CI/CD 파이프라인
-
-### GitHub Actions 워크플로우
-1. **코드 품질 검사**: 린팅, 포맷팅, 보안 감사
-2. **멀티 환경 테스트**: Node.js 16, 18, 20 버전 테스트
-3. **Docker 이미지 빌드**: 멀티스테이지 빌드 및 푸시
-4. **보안 스캔**: Trivy를 활용한 컨테이너 보안 검사
-5. **환경별 배포**: 스테이징/프로덕션 환경 자동 배포
-6. **배포 후 테스트**: 배포된 애플리케이션 상태 확인
-
-### Repository Secrets 설정
-```bash
-# Docker Hub
-DOCKER_USERNAME: your-docker-username
-DOCKER_PASSWORD: your-docker-password
-
-# 스테이징 환경
-STAGING_VM_HOST: staging-vm-public-ip
-STAGING_VM_USERNAME: ubuntu
-STAGING_VM_SSH_KEY: staging-vm-ssh-private-key
-STAGING_DB_PASSWORD: staging-db-password
-STAGING_REDIS_PASSWORD: staging-redis-password
-
-# 프로덕션 환경
-PROD_VM_HOST: prod-vm-public-ip
-PROD_VM_USERNAME: ubuntu
-PROD_VM_SSH_KEY: prod-vm-ssh-private-key
-PROD_DB_PASSWORD: prod-db-password
-PROD_REDIS_PASSWORD: prod-redis-password
-```
-
-## 📈 모니터링
-
-### Prometheus 메트릭
-- `http_requests_total`: HTTP 요청 총 수
-- `http_request_duration_seconds`: HTTP 요청 응답 시간
-- `active_connections`: 활성 연결 수
-- `nodejs_*`: Node.js 기본 메트릭
-
-### 헬스체크
-- **애플리케이션**: `/health` 엔드포인트
-- **데이터베이스**: PostgreSQL 연결 상태
-- **Redis**: Redis 연결 상태
-- **메모리**: 메모리 사용량 모니터링
 
 ## 🚨 문제 해결
 
-### 자주 발생하는 문제
+### **자주 발생하는 문제**
 
-1. **Docker Compose 서비스 시작 실패**
-   ```bash
-   # 로그 확인
-   docker-compose logs -f [service-name]
-   
-   # 서비스 재시작
-   docker-compose restart [service-name]
-   ```
+#### **1. Docker 빌드 실패**
+```bash
+# BuildKit 비활성화
+export DOCKER_BUILDKIT=0
+docker build -t github-actions-demo:latest .
+```
 
-2. **데이터베이스 연결 오류**
-   ```bash
-   # 환경 변수 확인
-   docker-compose config
-   
-   # 데이터베이스 상태 확인
-   docker-compose exec postgres pg_isready -U myapp_user
-   ```
+#### **2. 컨테이너 시작 실패**
+```bash
+# 로그 확인
+docker-compose logs
 
-3. **GitHub Actions 워크플로우 실패**
-   ```bash
-   # Secrets 설정 확인
-   # GitHub Repository > Settings > Secrets and variables > Actions
-   
-   # 워크플로우 파일 문법 검사
-   # .github/workflows/ 디렉토리 확인
-   ```
+# 컨테이너 재시작
+docker-compose restart
 
-4. **Nginx 프록시 오류**
-   ```bash
-   # Nginx 설정 확인
-   docker-compose exec nginx nginx -t
-   
-   # Nginx 재시작
-   docker-compose restart nginx
-   ```
+# 완전 정리 후 재시작
+docker-compose down --remove-orphans
+docker-compose up -d
+```
 
-## 📚 추가 학습 자료
+#### **3. 메트릭 수집 실패**
+```bash
+# Prometheus 타겟 상태 확인
+curl http://localhost:9090/api/v1/targets
 
-- [GitHub Actions 공식 문서](https://docs.github.com/en/actions)
-- [Docker Compose 공식 문서](https://docs.docker.com/compose/)
-- [PostgreSQL 공식 문서](https://www.postgresql.org/docs/)
-- [Redis 공식 문서](https://redis.io/documentation)
-- [Nginx 공식 문서](https://nginx.org/en/docs/)
+# 애플리케이션 메트릭 확인
+curl http://localhost:3000/metrics
+```
+
+### **상세 문제 해결 가이드**
+- [MONITORING.md](./MONITORING.md) - 모니터링 설정 및 문제 해결
+- [docs/DAY2-HANDSON.md](./docs/DAY2-HANDSON.md) - 실습 가이드
+
+## 📚 학습 자료
+
+### **강의 자료**
+- [Day 2 강의안](./docs/DAY2-LECTURE.md) - 이론 및 개념 설명
+- [Day 2 실습 가이드](./docs/DAY2-HANDSON.md) - 단계별 실습 가이드
+
+### **추가 학습**
+- [Docker 공식 문서](https://docs.docker.com/)
+- [GitHub Actions 문서](https://docs.github.com/en/actions)
 - [Prometheus 공식 문서](https://prometheus.io/docs/)
+- [Grafana 공식 문서](https://grafana.com/docs/)
+
+## 🎯 실습 완료 체크리스트
+
+### **Day 2 완료 후 확인사항**
+- [ ] 멀티스테이지 Dockerfile 빌드 성공
+- [ ] Docker Compose로 전체 스택 실행
+- [ ] Prometheus 메트릭 수집 확인
+- [ ] Grafana 대시보드 설정
+- [ ] GitHub Actions CI/CD 파이프라인 실행
+- [ ] 멀티 환경 배포 (AWS/GCP) 성공
+- [ ] 배포 후 테스트 통과
+- [ ] 모니터링 알림 설정
 
 ## 🤝 기여하기
 
@@ -335,11 +262,20 @@ PROD_REDIS_PASSWORD: prod-redis-password
 
 문제가 발생하거나 질문이 있으시면 다음을 통해 연락해주세요:
 
-- **Issues**: GitHub Issues
-- **Discussions**: GitHub Discussions
+- **Issues**: [GitHub Issues](https://github.com/jungfrau70/github-actions-demo-day2/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/jungfrau70/github-actions-demo-day2/discussions)
+
+## 🙏 감사의 말
+
+이 프로젝트는 다음 오픈소스 프로젝트들의 도움을 받아 만들어졌습니다:
+
+- [Node.js](https://nodejs.org/)
+- [Express.js](https://expressjs.com/)
+- [Docker](https://www.docker.com/)
+- [Prometheus](https://prometheus.io/)
+- [Grafana](https://grafana.com/)
+- [GitHub Actions](https://github.com/features/actions)
 
 ---
 
-**Happy Learning! 🎉**
-
-이 프로젝트를 통해 고급 CI/CD 파이프라인과 다중 서비스 환경을 구축하는 실무 경험을 쌓을 수 있습니다.
+**Happy Learning! 🚀**
