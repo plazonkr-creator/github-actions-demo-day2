@@ -62,6 +62,10 @@
       "**/tests/**/*.test.js"
     ],
     "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
-    "testTimeout": 30000
+    "testTimeout": 10000,
+    "bail": 1,
+    "verbose": true,
+    "forceExit": true,
+    "detectOpenHandles": true
   }
 }

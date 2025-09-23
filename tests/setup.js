@@ -48,4 +48,15 @@ afterAll(async () => {
 });
 
 // 전역 테스트 타임아웃 설정
-jest.setTimeout(30000);
+jest.setTimeout(10000);
+
+// 테스트 실패 시 즉시 종료
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
+});

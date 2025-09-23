@@ -60,7 +60,7 @@ jobs:
   test:
     name: 멀티 환경 테스트
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     strategy:
       matrix:
         node-version: [16, 18, 20]
@@ -184,12 +184,12 @@ jobs:
         
         # 애플리케이션 시작 대기
         echo "⏳ 애플리케이션 시작을 기다리는 중..."
-        for i in {1..30}; do
+        for i in {1..15}; do
           if curl -f http://localhost:3000/health >/dev/null 2>&1; then
             echo "✅ 애플리케이션이 성공적으로 시작되었습니다!"
             break
           fi
-          echo "시도 $i/30: 애플리케이션 시작 대기 중..."
+          echo "시도 $i/15: 애플리케이션 시작 대기 중..."
           sleep 2
         done
         
@@ -233,18 +233,30 @@ jobs:
     - name: 단위 테스트 실행
       run: |
         echo "🧪 단위 테스트 실행 중..."
-        timeout 300 npm run test:unit || {
+        set -e  # 에러 발생 시 즉시 종료
+        
+        # Jest를 --bail 옵션으로 실행하여 첫 번째 실패에서 중단
+        timeout 120 npm run test:unit -- --bail --verbose || {
           echo "❌ 단위 테스트 실패 또는 타임아웃"
+          echo "테스트 로그 확인:"
+          cat app.log 2>/dev/null || echo "애플리케이션 로그 없음"
           exit 1
         }
+        echo "✅ 단위 테스트 완료"
       
     - name: 통합 테스트 실행
       run: |
         echo "🔗 통합 테스트 실행 중..."
-        timeout 300 npm run test:integration || {
+        set -e  # 에러 발생 시 즉시 종료
+        
+        # Jest를 --bail 옵션으로 실행하여 첫 번째 실패에서 중단
+        timeout 120 npm run test:integration -- --bail --verbose || {
           echo "❌ 통합 테스트 실패 또는 타임아웃"
+          echo "테스트 로그 확인:"
+          cat app.log 2>/dev/null || echo "애플리케이션 로그 없음"
           exit 1
         }
+        echo "✅ 통합 테스트 완료"
       
     - name: 애플리케이션 정리
       if: always()
