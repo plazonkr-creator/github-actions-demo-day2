@@ -54,4 +54,4 @@ ENV PORT=3000
 ENTRYPOINT ["dumb-init", "--"]
 
 # 애플리케이션 실행
-CMD ["node", "src/app.js"]
+CMD ["node", "src/server.js"]
