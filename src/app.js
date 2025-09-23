@@ -487,3 +487,4 @@ app.use((error, req, res, next) => {
 module.exports = app;
 module.exports.setRedisClient = setRedisClient;
 // CI/CD 테스트 - Tue Sep 23 22:26:07 KST 2025
+// 프로덕션 배포 테스트 - Tue Sep 23 22:26:36 KST 2025
