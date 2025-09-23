@@ -422,10 +422,16 @@ app.get('/api/db/status', async (req, res) => {
         (SELECT count(*) FROM app_logs) as log_count
     `);
     
+    const data = result.rows[0];
+    
     res.json({
       success: true,
       status: 'connected',
-      data: result.rows[0]
+      data: {
+        ...data,
+        user_count: parseInt(data.user_count),
+        log_count: parseInt(data.log_count)
+      }
     });
     
   } catch (error) {
