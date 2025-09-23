@@ -279,12 +279,16 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
         
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
     - name: Docker 이미지 빌드 및 푸시
       id: build
       uses: docker/build-push-action@v5
       with:
         context: .
         push: true
+        platforms: linux/amd64
         tags: |
           ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
           ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
@@ -296,7 +300,7 @@ jobs:
           org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           org.opencontainers.image.revision=${{ github.sha }}
         cache-from: type=gha
-        cache-to: type=gha,mode=max
+        cache-to: type=gha
 
   # 보안 스캔
   security-scan:
