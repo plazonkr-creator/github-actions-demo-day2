@@ -355,10 +355,18 @@ jobs:
         username: ${{ secrets.PROD_VM_USERNAME }}
         key: ${{ secrets.PROD_VM_SSH_KEY }}
         script: |
-          # 환경 변수 설정
+          # 환경 변수 설정 (참조 프로젝트 가이드 적용)
           export DB_PASSWORD="${{ secrets.PROD_DB_PASSWORD }}"
           export REDIS_PASSWORD="${{ secrets.PROD_REDIS_PASSWORD }}"
           export CONTAINER_PREFIX="aws-vm-prod"
+          export NODE_ENV="production"
+          export PORT="3000"
+          
+          # 환경 변수 로드 확인
+          echo "🔍 환경 변수 확인:"
+          echo "CONTAINER_PREFIX: $CONTAINER_PREFIX"
+          echo "NODE_ENV: $NODE_ENV"
+          echo "PORT: $PORT"
           
           # 작업 디렉토리 생성 및 이동
           mkdir -p /home/${{ secrets.PROD_VM_USERNAME }}/app
@@ -422,18 +430,35 @@ jobs:
         script: |
           cd /home/${{ secrets.PROD_VM_USERNAME }}/app
           
-          # 환경 변수 설정
+          # 환경 변수 설정 (참조 프로젝트 가이드 적용)
           export DB_PASSWORD="${{ secrets.PROD_DB_PASSWORD }}"
           export REDIS_PASSWORD="${{ secrets.PROD_REDIS_PASSWORD }}"
           export CONTAINER_PREFIX="aws-vm-prod"
+          export NODE_ENV="production"
+          export PORT="3000"
+          
+          # 환경 변수 로드 확인
+          echo "🔍 환경 변수 확인:"
+          echo "CONTAINER_PREFIX: $CONTAINER_PREFIX"
+          echo "NODE_ENV: $NODE_ENV"
+          echo "PORT: $PORT"
           
           # 기존 서비스 및 이미지 정리
           echo "🧹 기존 서비스 및 이미지 정리 중..."
           docker-compose -f docker-compose.prod.yml down --remove-orphans || true
           docker stop $(docker ps -aq) 2>/dev/null || true
           docker rm $(docker ps -aq) 2>/dev/null || true
-          docker system prune -af || true
+          docker system prune -a -f || true
           docker volume prune -f || true
+          
+          # Docker 서비스 재시작 (참조 프로젝트 가이드 적용)
+          echo "🔄 Docker 서비스 재시작 중..."
+          sudo systemctl restart docker || true
+          sleep 10
+          
+          # Docker 이미지 강제 재빌드 (참조 프로젝트 가이드 적용)
+          echo "🔨 Docker 이미지 강제 재빌드 중..."
+          docker-compose -f docker-compose.prod.yml build --no-cache app
           
           # Docker Compose로 서비스 시작
           echo "🚀 Docker Compose로 서비스 시작 중..."
@@ -443,49 +468,69 @@ jobs:
           echo "⏳ 서비스 시작을 기다리는 중..."
           sleep 30
           
-          # Docker 서비스 상태 확인
+          # Docker 서비스 상태 확인 (참조 프로젝트 가이드 적용)
           echo "🔍 Docker 서비스 상태 확인..."
           docker-compose -f docker-compose.prod.yml ps
           
-          # 모든 서비스가 healthy 상태가 될 때까지 대기
+          # 포트 충돌 확인
+          echo "🔍 포트 충돌 확인..."
+          netstat -tulpn | grep :3000 || echo "포트 3000 사용 가능"
+          netstat -tulpn | grep :80 || echo "포트 80 사용 가능"
+          
+          # 컨테이너 로그 확인
+          echo "📋 컨테이너 로그 확인..."
+          docker-compose -f docker-compose.prod.yml logs app | tail -20
+          
+          # 모든 서비스가 healthy 상태가 될 때까지 대기 (참조 프로젝트 가이드 적용)
           echo "🏥 서비스 헬스체크 대기 중..."
-          for i in {1..20}; do
-            echo "헬스체크 대기 시도 $i/20..."
+          for i in {1..30}; do
+            echo "헬스체크 대기 시도 $i/30..."
             
             # 모든 서비스 상태 확인
             if docker-compose -f docker-compose.prod.yml ps | grep -q "unhealthy"; then
               echo "일부 서비스가 아직 unhealthy 상태입니다..."
-              sleep 15
+              echo "현재 서비스 상태:"
+              docker-compose -f docker-compose.prod.yml ps
+              sleep 10
               continue
             fi
             
-            # nginx가 포트 80에서 리스닝하는지 확인
-            if netstat -tlnp 2>/dev/null | grep :80 > /dev/null; then
-              echo "✅ nginx가 포트 80에서 리스닝 중"
+            # app 서비스가 포트 3000에서 리스닝하는지 확인
+            if netstat -tlnp 2>/dev/null | grep :3000 > /dev/null; then
+              echo "✅ app이 포트 3000에서 리스닝 중"
               
-              # 실제 헬스체크 시도
-              if curl -f http://localhost/health 2>/dev/null; then
-                echo "✅ 헬스체크 성공!"
-                break
+              # nginx가 포트 80에서 리스닝하는지 확인
+              if netstat -tlnp 2>/dev/null | grep :80 > /dev/null; then
+                echo "✅ nginx가 포트 80에서 리스닝 중"
+                
+                # 실제 헬스체크 시도
+                if curl -f http://localhost/health 2>/dev/null; then
+                  echo "✅ 헬스체크 성공!"
+                  break
+                else
+                  echo "nginx는 리스닝 중이지만 헬스체크 실패, 재시도 중..."
+                  sleep 10
+                  continue
+                fi
               else
-                echo "nginx는 리스닝 중이지만 헬스체크 실패, 재시도 중..."
+                echo "nginx가 아직 포트 80에서 리스닝하지 않음..."
                 sleep 10
                 continue
               fi
             else
-              echo "nginx가 아직 포트 80에서 리스닝하지 않음..."
-              sleep 15
+              echo "app이 아직 포트 3000에서 리스닝하지 않음..."
+              sleep 10
               continue
             fi
             
-            if [ $i -eq 20 ]; then
+            if [ $i -eq 30 ]; then
               echo "❌ 헬스체크 실패 - 서비스 로그 확인"
               echo "Docker 서비스 상태:"
               docker-compose -f docker-compose.prod.yml ps
-              echo "nginx 로그:"
-              docker-compose -f docker-compose.prod.yml logs nginx
               echo "app 로그:"
               docker-compose -f docker-compose.prod.yml logs app
+              echo "nginx 로그:"
+              docker-compose -f docker-compose.prod.yml logs nginx
               echo "postgres 로그:"
               docker-compose -f docker-compose.prod.yml logs postgres
               echo "redis 로그:"
@@ -593,8 +638,13 @@ jobs:
           docker-compose -f docker-compose.prod.yml down --remove-orphans || true
           docker stop $(docker ps -aq) 2>/dev/null || true
           docker rm $(docker ps -aq) 2>/dev/null || true
-          docker system prune -af || true
+          docker system prune -a -f || true
           docker volume prune -f || true
+          
+          # Docker 서비스 재시작 (참조 프로젝트 가이드 적용)
+          echo "🔄 Docker 서비스 재시작 중..."
+          sudo systemctl restart docker || true
+          sleep 10
           
           # Docker Compose로 서비스 시작
           docker-compose -f docker-compose.prod.yml up -d
@@ -642,10 +692,18 @@ jobs:
         username: ${{ secrets.PROD_VM_USERNAME }}
         key: ${{ secrets.PROD_VM_SSH_KEY }}
         script: |
-          # 환경 변수 설정
+          # 환경 변수 설정 (참조 프로젝트 가이드 적용)
           export DB_PASSWORD="${{ secrets.PROD_DB_PASSWORD }}"
           export REDIS_PASSWORD="${{ secrets.PROD_REDIS_PASSWORD }}"
           export CONTAINER_PREFIX="aws-vm-prod"
+          export NODE_ENV="production"
+          export PORT="3000"
+          
+          # 환경 변수 로드 확인
+          echo "🔍 환경 변수 확인:"
+          echo "CONTAINER_PREFIX: $CONTAINER_PREFIX"
+          echo "NODE_ENV: $NODE_ENV"
+          echo "PORT: $PORT"
           
           # 작업 디렉토리 생성 및 이동
           mkdir -p /home/${{ secrets.PROD_VM_USERNAME }}/app
@@ -720,8 +778,17 @@ jobs:
           docker-compose -f docker-compose.prod.yml down --remove-orphans || true
           docker stop $(docker ps -aq) 2>/dev/null || true
           docker rm $(docker ps -aq) 2>/dev/null || true
-          docker system prune -af || true
+          docker system prune -a -f || true
           docker volume prune -f || true
+          
+          # Docker 서비스 재시작 (참조 프로젝트 가이드 적용)
+          echo "🔄 Docker 서비스 재시작 중..."
+          sudo systemctl restart docker || true
+          sleep 10
+          
+          # Docker 이미지 강제 재빌드 (참조 프로젝트 가이드 적용)
+          echo "🔨 Docker 이미지 강제 재빌드 중..."
+          docker-compose -f docker-compose.prod.yml build --no-cache app
           
           # Docker Compose로 서비스 시작
           echo "🚀 Docker Compose로 서비스 시작 중..."
@@ -731,49 +798,69 @@ jobs:
           echo "⏳ 서비스 시작을 기다리는 중..."
           sleep 30
           
-          # Docker 서비스 상태 확인
+          # Docker 서비스 상태 확인 (참조 프로젝트 가이드 적용)
           echo "🔍 Docker 서비스 상태 확인..."
           docker-compose -f docker-compose.prod.yml ps
           
-          # 모든 서비스가 healthy 상태가 될 때까지 대기
+          # 포트 충돌 확인
+          echo "🔍 포트 충돌 확인..."
+          netstat -tulpn | grep :3000 || echo "포트 3000 사용 가능"
+          netstat -tulpn | grep :80 || echo "포트 80 사용 가능"
+          
+          # 컨테이너 로그 확인
+          echo "📋 컨테이너 로그 확인..."
+          docker-compose -f docker-compose.prod.yml logs app | tail -20
+          
+          # 모든 서비스가 healthy 상태가 될 때까지 대기 (참조 프로젝트 가이드 적용)
           echo "🏥 서비스 헬스체크 대기 중..."
-          for i in {1..20}; do
-            echo "헬스체크 대기 시도 $i/20..."
+          for i in {1..30}; do
+            echo "헬스체크 대기 시도 $i/30..."
             
             # 모든 서비스 상태 확인
             if docker-compose -f docker-compose.prod.yml ps | grep -q "unhealthy"; then
               echo "일부 서비스가 아직 unhealthy 상태입니다..."
-              sleep 15
+              echo "현재 서비스 상태:"
+              docker-compose -f docker-compose.prod.yml ps
+              sleep 10
               continue
             fi
             
-            # nginx가 포트 80에서 리스닝하는지 확인
-            if netstat -tlnp 2>/dev/null | grep :80 > /dev/null; then
-              echo "✅ nginx가 포트 80에서 리스닝 중"
+            # app 서비스가 포트 3000에서 리스닝하는지 확인
+            if netstat -tlnp 2>/dev/null | grep :3000 > /dev/null; then
+              echo "✅ app이 포트 3000에서 리스닝 중"
               
-              # 실제 헬스체크 시도
-              if curl -f http://localhost/health 2>/dev/null; then
-                echo "✅ 헬스체크 성공!"
-                break
+              # nginx가 포트 80에서 리스닝하는지 확인
+              if netstat -tlnp 2>/dev/null | grep :80 > /dev/null; then
+                echo "✅ nginx가 포트 80에서 리스닝 중"
+                
+                # 실제 헬스체크 시도
+                if curl -f http://localhost/health 2>/dev/null; then
+                  echo "✅ 헬스체크 성공!"
+                  break
+                else
+                  echo "nginx는 리스닝 중이지만 헬스체크 실패, 재시도 중..."
+                  sleep 10
+                  continue
+                fi
               else
-                echo "nginx는 리스닝 중이지만 헬스체크 실패, 재시도 중..."
+                echo "nginx가 아직 포트 80에서 리스닝하지 않음..."
                 sleep 10
                 continue
               fi
             else
-              echo "nginx가 아직 포트 80에서 리스닝하지 않음..."
-              sleep 15
+              echo "app이 아직 포트 3000에서 리스닝하지 않음..."
+              sleep 10
               continue
             fi
             
-            if [ $i -eq 20 ]; then
+            if [ $i -eq 30 ]; then
               echo "❌ 헬스체크 실패 - 서비스 로그 확인"
               echo "Docker 서비스 상태:"
               docker-compose -f docker-compose.prod.yml ps
-              echo "nginx 로그:"
-              docker-compose -f docker-compose.prod.yml logs nginx
               echo "app 로그:"
               docker-compose -f docker-compose.prod.yml logs app
+              echo "nginx 로그:"
+              docker-compose -f docker-compose.prod.yml logs nginx
               echo "postgres 로그:"
               docker-compose -f docker-compose.prod.yml logs postgres
               echo "redis 로그:"
@@ -885,8 +972,13 @@ jobs:
           docker-compose -f docker-compose.prod.yml down --remove-orphans || true
           docker stop $(docker ps -aq) 2>/dev/null || true
           docker rm $(docker ps -aq) 2>/dev/null || true
-          docker system prune -af || true
+          docker system prune -a -f || true
           docker volume prune -f || true
+          
+          # Docker 서비스 재시작 (참조 프로젝트 가이드 적용)
+          echo "🔄 Docker 서비스 재시작 중..."
+          sudo systemctl restart docker || true
+          sleep 10
           
           # Docker Compose로 서비스 시작
           docker-compose -f docker-compose.prod.yml up -d
