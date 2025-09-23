@@ -421,7 +421,10 @@ jobs:
           # 기존 서비스 및 이미지 정리
           echo "🧹 기존 서비스 및 이미지 정리 중..."
           docker-compose -f docker-compose.prod.yml down --remove-orphans || true
-          docker system prune -f || true
+          docker stop $(docker ps -aq) 2>/dev/null || true
+          docker rm $(docker ps -aq) 2>/dev/null || true
+          docker system prune -af || true
+          docker volume prune -f || true
           
           # Docker Compose로 서비스 시작
           echo "🚀 Docker Compose로 서비스 시작 중..."
@@ -579,7 +582,10 @@ jobs:
           # 기존 서비스 및 이미지 정리
           echo "🧹 기존 서비스 및 이미지 정리 중..."
           docker-compose -f docker-compose.prod.yml down --remove-orphans || true
-          docker system prune -f || true
+          docker stop $(docker ps -aq) 2>/dev/null || true
+          docker rm $(docker ps -aq) 2>/dev/null || true
+          docker system prune -af || true
+          docker volume prune -f || true
           
           # Docker Compose로 서비스 시작
           docker-compose -f docker-compose.prod.yml up -d
@@ -703,7 +709,10 @@ jobs:
           # 기존 서비스 및 이미지 정리
           echo "🧹 기존 서비스 및 이미지 정리 중..."
           docker-compose -f docker-compose.prod.yml down --remove-orphans || true
-          docker system prune -f || true
+          docker stop $(docker ps -aq) 2>/dev/null || true
+          docker rm $(docker ps -aq) 2>/dev/null || true
+          docker system prune -af || true
+          docker volume prune -f || true
           
           # Docker Compose로 서비스 시작
           echo "🚀 Docker Compose로 서비스 시작 중..."
@@ -865,7 +874,10 @@ jobs:
           # 기존 서비스 및 이미지 정리
           echo "🧹 기존 서비스 및 이미지 정리 중..."
           docker-compose -f docker-compose.prod.yml down --remove-orphans || true
-          docker system prune -f || true
+          docker stop $(docker ps -aq) 2>/dev/null || true
+          docker rm $(docker ps -aq) 2>/dev/null || true
+          docker system prune -af || true
+          docker volume prune -f || true
           
           # Docker Compose로 서비스 시작
           docker-compose -f docker-compose.prod.yml up -d
