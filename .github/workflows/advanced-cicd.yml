@@ -336,6 +336,9 @@ jobs:
     if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/day2-advanced' || github.event.inputs.environment == 'staging'
     environment: aws-production
     steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
     - name: AWS VM 배포 (PROD)
       uses: appleboy/ssh-action@v1.0.0
       with:
@@ -347,19 +350,94 @@ jobs:
           export DB_PASSWORD="${{ secrets.PROD_DB_PASSWORD }}"
           export REDIS_PASSWORD="${{ secrets.PROD_REDIS_PASSWORD }}"
           
-          # 기존 서비스 중지
-          docker-compose -f docker-compose.prod.yml down
+          # 작업 디렉토리 생성 및 이동
+          mkdir -p /home/${{ secrets.PROD_VM_USERNAME }}/app
+          cd /home/${{ secrets.PROD_VM_USERNAME }}/app
+          
+          # 기존 서비스 중지 (파일이 있는 경우에만)
+          if [ -f docker-compose.prod.yml ]; then
+            docker-compose -f docker-compose.prod.yml down
+          fi
           
           # 최신 이미지 풀
           echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
           docker pull ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
           
-          # AWS VM 배포
+          # 이전 이미지 정리
+          docker image prune -f
+          
+    - name: 필요한 파일들을 원격 서버에 복사
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.PROD_VM_HOST }}
+        username: ${{ secrets.PROD_VM_USERNAME }}
+        key: ${{ secrets.PROD_VM_SSH_KEY }}
+        source: "docker-compose.prod.yml,nginx/nginx.prod.conf"
+        target: "/home/${{ secrets.PROD_VM_USERNAME }}/app/"
+        
+    - name: nginx 디렉토리 생성 및 설정 파일 배치
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.PROD_VM_HOST }}
+        username: ${{ secrets.PROD_VM_USERNAME }}
+        key: ${{ secrets.PROD_VM_SSH_KEY }}
+        script: |
+          cd /home/${{ secrets.PROD_VM_USERNAME }}/app
+          
+          # nginx 디렉토리 생성
+          mkdir -p nginx
+          mv nginx.prod.conf nginx/nginx.prod.conf
+          
+          # logs 디렉토리 생성
+          mkdir -p logs
+          
+          # 데이터베이스 초기화 스크립트 디렉토리 생성
+          mkdir -p database
+          
+    - name: 데이터베이스 초기화 스크립트 복사
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.PROD_VM_HOST }}
+        username: ${{ secrets.PROD_VM_USERNAME }}
+        key: ${{ secrets.PROD_VM_SSH_KEY }}
+        source: "database/"
+        target: "/home/${{ secrets.PROD_VM_USERNAME }}/app/"
+        
+    - name: AWS VM 배포 실행
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.PROD_VM_HOST }}
+        username: ${{ secrets.PROD_VM_USERNAME }}
+        key: ${{ secrets.PROD_VM_SSH_KEY }}
+        script: |
+          cd /home/${{ secrets.PROD_VM_USERNAME }}/app
+          
+          # 환경 변수 설정
+          export DB_PASSWORD="${{ secrets.PROD_DB_PASSWORD }}"
+          export REDIS_PASSWORD="${{ secrets.PROD_REDIS_PASSWORD }}"
+          
+          # Docker Compose로 서비스 시작
           docker-compose -f docker-compose.prod.yml up -d
           
-          # 헬스체크
+          # 서비스 시작 대기
+          echo "⏳ 서비스 시작을 기다리는 중..."
           sleep 30
-          curl -f http://localhost/health || exit 1
+          
+          # 헬스체크 (여러 번 시도)
+          echo "🏥 헬스체크 시작..."
+          for i in {1..10}; do
+            echo "헬스체크 시도 $i/10..."
+            if curl -f http://localhost/health; then
+              echo "✅ 헬스체크 성공!"
+              break
+            fi
+            if [ $i -eq 10 ]; then
+              echo "❌ 헬스체크 실패 - 서비스 로그 확인"
+              docker-compose -f docker-compose.prod.yml logs
+              exit 1
+            fi
+            sleep 10
+          done
           
           # 배포 알림
           echo "✅ AWS VM deployment completed successfully"
@@ -374,7 +452,10 @@ jobs:
     if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/day2-advanced' || github.event.inputs.environment == 'staging'
     environment: gcp-staging
     steps:
-    - name: GCP VM 배포 (STAGING)
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: GCP VM 배포 준비 (STAGING)
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.STAGING_VM_HOST }}
@@ -385,19 +466,94 @@ jobs:
           export DB_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}"
           export REDIS_PASSWORD="${{ secrets.STAGING_REDIS_PASSWORD }}"
           
-          # 기존 서비스 중지
-          docker-compose -f docker-compose.prod.yml down
+          # 작업 디렉토리 생성 및 이동
+          mkdir -p /home/${{ secrets.STAGING_VM_USERNAME }}/app
+          cd /home/${{ secrets.STAGING_VM_USERNAME }}/app
+          
+          # 기존 서비스 중지 (파일이 있는 경우에만)
+          if [ -f docker-compose.prod.yml ]; then
+            docker-compose -f docker-compose.prod.yml down
+          fi
           
           # 최신 이미지 풀
           echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
           docker pull ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
           
-          # GCP VM 배포
+          # 이전 이미지 정리
+          docker image prune -f
+          
+    - name: 필요한 파일들을 원격 서버에 복사
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.STAGING_VM_HOST }}
+        username: ${{ secrets.STAGING_VM_USERNAME }}
+        key: ${{ secrets.STAGING_VM_SSH_KEY }}
+        source: "docker-compose.prod.yml,nginx/nginx.prod.conf"
+        target: "/home/${{ secrets.STAGING_VM_USERNAME }}/app/"
+        
+    - name: nginx 디렉토리 생성 및 설정 파일 배치
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.STAGING_VM_HOST }}
+        username: ${{ secrets.STAGING_VM_USERNAME }}
+        key: ${{ secrets.STAGING_VM_SSH_KEY }}
+        script: |
+          cd /home/${{ secrets.STAGING_VM_USERNAME }}/app
+          
+          # nginx 디렉토리 생성
+          mkdir -p nginx
+          mv nginx.prod.conf nginx/nginx.prod.conf
+          
+          # logs 디렉토리 생성
+          mkdir -p logs
+          
+          # 데이터베이스 초기화 스크립트 디렉토리 생성
+          mkdir -p database
+          
+    - name: 데이터베이스 초기화 스크립트 복사
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.STAGING_VM_HOST }}
+        username: ${{ secrets.STAGING_VM_USERNAME }}
+        key: ${{ secrets.STAGING_VM_SSH_KEY }}
+        source: "database/"
+        target: "/home/${{ secrets.STAGING_VM_USERNAME }}/app/"
+        
+    - name: GCP VM 배포 실행
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.STAGING_VM_HOST }}
+        username: ${{ secrets.STAGING_VM_USERNAME }}
+        key: ${{ secrets.STAGING_VM_SSH_KEY }}
+        script: |
+          cd /home/${{ secrets.STAGING_VM_USERNAME }}/app
+          
+          # 환경 변수 설정
+          export DB_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}"
+          export REDIS_PASSWORD="${{ secrets.STAGING_REDIS_PASSWORD }}"
+          
+          # Docker Compose로 서비스 시작
           docker-compose -f docker-compose.prod.yml up -d
           
-          # 헬스체크
+          # 서비스 시작 대기
+          echo "⏳ 서비스 시작을 기다리는 중..."
           sleep 30
-          curl -f http://localhost/health || exit 1
+          
+          # 헬스체크 (여러 번 시도)
+          echo "🏥 헬스체크 시작..."
+          for i in {1..10}; do
+            echo "헬스체크 시도 $i/10..."
+            if curl -f http://localhost/health; then
+              echo "✅ 헬스체크 성공!"
+              break
+            fi
+            if [ $i -eq 10 ]; then
+              echo "❌ 헬스체크 실패 - 서비스 로그 확인"
+              docker-compose -f docker-compose.prod.yml logs
+              exit 1
+            fi
+            sleep 10
+          done
           
           # 배포 알림
           echo "✅ GCP VM deployment completed successfully"
@@ -412,7 +568,10 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/day2-advanced' || github.event.inputs.environment == 'production'
     environment: aws-production
     steps:
-    - name: AWS 프로덕션 배포
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: AWS 프로덕션 배포 준비
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.AWS_VM_HOST }}
@@ -423,20 +582,95 @@ jobs:
           export DB_PASSWORD="${{ secrets.AWS_DB_PASSWORD }}"
           export REDIS_PASSWORD="${{ secrets.AWS_REDIS_PASSWORD }}"
           
+          # 작업 디렉토리 생성 및 이동
+          mkdir -p /home/${{ secrets.AWS_VM_USERNAME }}/app
+          cd /home/${{ secrets.AWS_VM_USERNAME }}/app
+          
           # Blue-Green 배포를 위한 백업
-          docker-compose -f docker-compose.prod.yml down
-          docker tag ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:backup-$(date +%Y%m%d-%H%M%S)
+          if [ -f docker-compose.prod.yml ]; then
+            docker-compose -f docker-compose.prod.yml down
+            docker tag ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:backup-$(date +%Y%m%d-%H%M%S)
+          fi
           
           # 최신 이미지 풀
           echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
           docker pull ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
           
-          # AWS 프로덕션 배포
+          # 이전 이미지 정리
+          docker image prune -f
+          
+    - name: 필요한 파일들을 원격 서버에 복사
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.AWS_VM_HOST }}
+        username: ${{ secrets.AWS_VM_USERNAME }}
+        key: ${{ secrets.AWS_VM_SSH_KEY }}
+        source: "docker-compose.prod.yml,nginx/nginx.prod.conf"
+        target: "/home/${{ secrets.AWS_VM_USERNAME }}/app/"
+        
+    - name: nginx 디렉토리 생성 및 설정 파일 배치
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.AWS_VM_HOST }}
+        username: ${{ secrets.AWS_VM_USERNAME }}
+        key: ${{ secrets.AWS_VM_SSH_KEY }}
+        script: |
+          cd /home/${{ secrets.AWS_VM_USERNAME }}/app
+          
+          # nginx 디렉토리 생성
+          mkdir -p nginx
+          mv nginx.prod.conf nginx/nginx.prod.conf
+          
+          # logs 디렉토리 생성
+          mkdir -p logs
+          
+          # 데이터베이스 초기화 스크립트 디렉토리 생성
+          mkdir -p database
+          
+    - name: 데이터베이스 초기화 스크립트 복사
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.AWS_VM_HOST }}
+        username: ${{ secrets.AWS_VM_USERNAME }}
+        key: ${{ secrets.AWS_VM_SSH_KEY }}
+        source: "database/"
+        target: "/home/${{ secrets.AWS_VM_USERNAME }}/app/"
+        
+    - name: AWS 프로덕션 배포 실행
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.AWS_VM_HOST }}
+        username: ${{ secrets.AWS_VM_USERNAME }}
+        key: ${{ secrets.AWS_VM_SSH_KEY }}
+        script: |
+          cd /home/${{ secrets.AWS_VM_USERNAME }}/app
+          
+          # 환경 변수 설정
+          export DB_PASSWORD="${{ secrets.AWS_DB_PASSWORD }}"
+          export REDIS_PASSWORD="${{ secrets.AWS_REDIS_PASSWORD }}"
+          
+          # Docker Compose로 서비스 시작
           docker-compose -f docker-compose.prod.yml up -d
           
-          # 헬스체크
+          # 서비스 시작 대기
+          echo "⏳ 서비스 시작을 기다리는 중..."
           sleep 30
-          curl -f http://localhost/health || exit 1
+          
+          # 헬스체크 (여러 번 시도)
+          echo "🏥 헬스체크 시작..."
+          for i in {1..10}; do
+            echo "헬스체크 시도 $i/10..."
+            if curl -f http://localhost/health; then
+              echo "✅ 헬스체크 성공!"
+              break
+            fi
+            if [ $i -eq 10 ]; then
+              echo "❌ 헬스체크 실패 - 서비스 로그 확인"
+              docker-compose -f docker-compose.prod.yml logs
+              exit 1
+            fi
+            sleep 10
+          done
           
           # 배포 알림
           echo "🚀 AWS Production deployment completed successfully"
@@ -454,7 +688,10 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/day2-advanced' || github.event.inputs.environment == 'production'
     environment: gcp-production
     steps:
-    - name: GCP 프로덕션 배포 (STAGING)
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: GCP 프로덕션 배포 준비
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.STAGING_VM_HOST }}
@@ -465,20 +702,95 @@ jobs:
           export DB_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}"
           export REDIS_PASSWORD="${{ secrets.STAGING_REDIS_PASSWORD }}"
           
+          # 작업 디렉토리 생성 및 이동
+          mkdir -p /home/${{ secrets.STAGING_VM_USERNAME }}/app
+          cd /home/${{ secrets.STAGING_VM_USERNAME }}/app
+          
           # Blue-Green 배포를 위한 백업
-          docker-compose -f docker-compose.prod.yml down
-          docker tag ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:backup-$(date +%Y%m%d-%H%M%S)
+          if [ -f docker-compose.prod.yml ]; then
+            docker-compose -f docker-compose.prod.yml down
+            docker tag ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:backup-$(date +%Y%m%d-%H%M%S)
+          fi
           
           # 최신 이미지 풀
           echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
           docker pull ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
           
-          # GCP 프로덕션 배포
+          # 이전 이미지 정리
+          docker image prune -f
+          
+    - name: 필요한 파일들을 원격 서버에 복사
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.STAGING_VM_HOST }}
+        username: ${{ secrets.STAGING_VM_USERNAME }}
+        key: ${{ secrets.STAGING_VM_SSH_KEY }}
+        source: "docker-compose.prod.yml,nginx/nginx.prod.conf"
+        target: "/home/${{ secrets.STAGING_VM_USERNAME }}/app/"
+        
+    - name: nginx 디렉토리 생성 및 설정 파일 배치
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.STAGING_VM_HOST }}
+        username: ${{ secrets.STAGING_VM_USERNAME }}
+        key: ${{ secrets.STAGING_VM_SSH_KEY }}
+        script: |
+          cd /home/${{ secrets.STAGING_VM_USERNAME }}/app
+          
+          # nginx 디렉토리 생성
+          mkdir -p nginx
+          mv nginx.prod.conf nginx/nginx.prod.conf
+          
+          # logs 디렉토리 생성
+          mkdir -p logs
+          
+          # 데이터베이스 초기화 스크립트 디렉토리 생성
+          mkdir -p database
+          
+    - name: 데이터베이스 초기화 스크립트 복사
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.STAGING_VM_HOST }}
+        username: ${{ secrets.STAGING_VM_USERNAME }}
+        key: ${{ secrets.STAGING_VM_SSH_KEY }}
+        source: "database/"
+        target: "/home/${{ secrets.STAGING_VM_USERNAME }}/app/"
+        
+    - name: GCP 프로덕션 배포 실행
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.STAGING_VM_HOST }}
+        username: ${{ secrets.STAGING_VM_USERNAME }}
+        key: ${{ secrets.STAGING_VM_SSH_KEY }}
+        script: |
+          cd /home/${{ secrets.STAGING_VM_USERNAME }}/app
+          
+          # 환경 변수 설정
+          export DB_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}"
+          export REDIS_PASSWORD="${{ secrets.STAGING_REDIS_PASSWORD }}"
+          
+          # Docker Compose로 서비스 시작
           docker-compose -f docker-compose.prod.yml up -d
           
-          # 헬스체크
+          # 서비스 시작 대기
+          echo "⏳ 서비스 시작을 기다리는 중..."
           sleep 30
-          curl -f http://localhost/health || exit 1
+          
+          # 헬스체크 (여러 번 시도)
+          echo "🏥 헬스체크 시작..."
+          for i in {1..10}; do
+            echo "헬스체크 시도 $i/10..."
+            if curl -f http://localhost/health; then
+              echo "✅ 헬스체크 성공!"
+              break
+            fi
+            if [ $i -eq 10 ]; then
+              echo "❌ 헬스체크 실패 - 서비스 로그 확인"
+              docker-compose -f docker-compose.prod.yml logs
+              exit 1
+            fi
+            sleep 10
+          done
           
           # 배포 알림
           echo "🚀 GCP Production deployment completed successfully"

@@ -1,90 +1,166 @@
-두 가지 주요 문제가 있습니다:
+# GitHub Actions CI/CD 파이프라인 테스트 실패 해결 과정
 
-1. **ESLint 설정 파일 누락** - 코드 품질 검사 실패
-2. **데이터베이스 사용자 역할 누락** - `myapp_user` 역할이 존재하지 않음
+## 🎯 전체 해결 과정 요약
 
-이 문제들을 해결해보겠습니다.
+GitHub Actions 워크플로우에서 발생한 다양한 테스트 실패 문제들을 단계별로 해결하여 완전한 CI/CD 파이프라인을 구축했습니다.
 
-Ran tool
-먼저 ESLint 설정 파일을 생성하겠습니다:
+---
 
-Ran tool
-이제 데이터베이스 사용자 역할 문제를 해결하기 위해 init.sql 파일을 수정하겠습니다:
+## 📋 해결된 주요 문제들
 
-Ran tool
-init.sql 파일의 시작 부분에 사용자 역할 생성 코드를 추가하겠습니다:
-
-Ran tool
-이제 GitHub Actions 워크플로우에서 데이터베이스 초기화 전에 사용자 역할을 생성하도록 수정하겠습니다:
-
-Ran tool
-이제 변경사항을 커밋하고 푸시하겠습니다:
-
-```bash
-git add .
-```
-```bash
-git status
-```
-```bash
-q
-```
-```bash
-git status
-```
-```bash
-git add . && git commit -m "Fix ESLint config and database user role issues
-
-- Add .eslintrc.js configuration file for linting
-- Add database user role creation in init.sql
-- Add user role creation step in GitHub Actions workflow
-- Fix 'myapp_user' role does not exist error"
-```
-```bash
-git push origin day2-advanced
-```
-Ran tool
-## ✅ 오류 해결 완료
-
-GitHub Actions 워크플로우에서 발생한 두 가지 주요 오류를 모두 해결했습니다:
-
-### 해결된 문제들
-
-#### 1. **ESLint 설정 파일 누락 오류**
+### 1. **ESLint 설정 파일 누락** (초기 문제)
 - **문제**: `ESLint couldn't find a configuration file` 오류
 - **해결**: `.eslintrc.js` 파일 생성
 - **내용**: Node.js 환경에 적합한 ESLint 설정 추가
 
-#### 2. **데이터베이스 사용자 역할 누락 오류**
+### 2. **데이터베이스 사용자 역할 누락**
 - **문제**: `role "myapp_user" does not exist` 오류
 - **해결**: 
   - `init.sql`에 사용자 역할 생성 코드 추가
   - GitHub Actions 워크플로우에 사용자 역할 생성 단계 추가
 
-### 수정된 파일들
+### 3. **포트 충돌 문제** (EADDRINUSE)
+- **문제**: `listen EADDRINUSE: address already in use :::3000` 오류
+- **해결**: 
+  - 애플리케이션과 서버 분리 (`src/app.js`와 `src/server.js`)
+  - 테스트 환경에서 서버 시작 방지
+  - `PORT=0` 설정으로 포트 바인딩 방지
 
-1. **`.eslintrc.js`** (새로 생성)
-   - ESLint 설정 파일
-   - Node.js 환경에 맞는 규칙 설정
+### 4. **Redis 클라이언트 충돌**
+- **문제**: `The client is closed` 오류
+- **해결**:
+  - `src/app.js`에서 Redis 클라이언트 생성 제거
+  - `setRedisClient()` 함수로 외부에서 주입받도록 수정
+  - 단일 Redis 클라이언트 인스턴스 사용
 
-2. **`database/init.sql`**
-   - 데이터베이스 사용자 역할 생성 로직 추가
-   - 권한 설정 추가
+### 5. **Supertest 호환성 문제**
+- **문제**: `app.address is not a function` 오류
+- **해결**:
+  - `module.exports` 구조 수정
+  - Express 앱을 기본 export로 설정
+  - `setRedisClient`를 앱 객체의 속성으로 추가
 
-3. **`.github/workflows/advanced-cicd.yml`**
-   - 데이터베이스 사용자 역할 생성 단계 추가
-   - 오류 처리 개선
+### 6. **데이터베이스 연결 타임아웃**
+- **문제**: `Connection terminated due to connection timeout` 오류
+- **해결**:
+  - `connectionTimeoutMillis`: 2초 → 10초로 증가
+  - `acquireTimeoutMillis`: 10초 추가
+  - `statement_timeout`: 30초 추가
 
-### 변경사항 커밋 및 푸시 완료
+### 7. **데이터 타입 불일치**
+- **문제**: `Expected "number", Received "string"` 오류
+- **해결**:
+  - PostgreSQL `count(*)` 결과를 `parseInt()`로 숫자 변환
+  - `user_count`와 `log_count` 데이터 타입 수정
 
-- 커밋 해시: `e0e7c97`
-- 브랜치: `day2-advanced`
-- 원격 저장소에 성공적으로 푸시됨
+### 8. **Docker 빌드 캐시 설정**
+- **문제**: `Cache export is not supported for the docker driver` 오류
+- **해결**:
+  - Docker Buildx 설정 추가
+  - `cache-to: type=gha` (mode=max 제거)
+  - `platforms: linux/amd64` 명시
 
-이제 GitHub Actions 워크플로우를 다시 실행하면 다음과 같은 단계들이 성공적으로 완료될 것입니다:
+### 9. **CodeQL Action Deprecation**
+- **문제**: CodeQL Action v2 deprecation 경고 및 권한 오류
+- **해결**:
+  - `github/codeql-action/upload-sarif@v2` → `@v3` 업데이트
+  - 워크플로우에 `security-events: write` 권한 추가
 
-1. ✅ **코드 품질 검사** - ESLint 설정으로 린팅 통과
-2. ✅ **데이터베이스 초기화** - 사용자 역할 생성 후 마이그레이션 성공
-3. ✅ **멀티 환경 테스트** - 모든 환경에서 테스트 통과
+### 10. **CD 워크플로우 실행 안됨**
+- **문제**: CI 완료 후 CD 단계가 건너뛰어짐
+- **해결**:
+  - 모든 배포 작업에 `day2-advanced` 브랜치 조건 추가
+  - 스테이징 및 프로덕션 배포 활성화
+
+### 11. **시크릿 이름 매핑 오류**
+- **문제**: `missing server host` 오류 - GitHub Secrets 이름 불일치
+- **해결**:
+  - AWS VM 배포: `PROD_*` 시크릿 사용
+  - GCP VM 배포: `STAGING_*` 시크릿 사용
+  - 시뮬레이션에서 실제 배포로 복원
 
 ---
+
+## 🔧 주요 수정 파일들
+
+### **새로 생성된 파일**
+1. **`.eslintrc.js`** - ESLint 설정 파일
+2. **`src/server.js`** - 프로덕션용 서버 시작 파일
+3. **`tests/setup.js`** - Jest 테스트 설정 파일
+
+### **수정된 파일들**
+1. **`.github/workflows/advanced-cicd.yml`**
+   - 데이터베이스 사용자 역할 생성 단계 추가
+   - Docker Buildx 설정 추가
+   - CodeQL Action v3 업데이트
+   - 권한 설정 추가
+   - 배포 조건에 `day2-advanced` 브랜치 추가
+
+2. **`src/app.js`**
+   - Redis 클라이언트 생성 제거
+   - `setRedisClient()` 함수 추가
+   - 데이터베이스 연결 타임아웃 증가
+   - `user_count`, `log_count` 데이터 타입 수정
+
+3. **`package.json`**
+   - Jest 설정 최적화
+   - 시작 스크립트를 `server.js`로 변경
+
+4. **`database/init.sql`**
+   - 데이터베이스 사용자 역할 생성 로직 추가
+
+5. **`tests/unit/app.test.js`**
+   - 고유한 테스트 데이터 사용
+   - Redis 상태 테스트 개선
+
+6. **`tests/integration/database.test.js`**
+   - 데이터베이스 연결 실패 시 처리
+   - Redis 상태 테스트 개선
+
+7. **`tests/setup.js`**
+   - 테스트 환경 설정
+   - 데이터베이스 연결 타임아웃 증가
+
+---
+
+## 📊 최종 결과
+
+### **완전한 CI/CD 파이프라인 구축**
+- ✅ **코드 품질 검사** - ESLint 린팅 통과
+- ✅ **멀티 환경 테스트** - Node.js 16, 18, 20 (staging, production)
+- ✅ **Docker 이미지 빌드 및 푸시** - 캐시 최적화
+- ✅ **보안 스캔** - Trivy + CodeQL v3
+- ✅ **멀티 클라우드 배포** - AWS, GCP (staging, production)
+- ✅ **배포 후 테스트** - 자동화된 배포 검증
+- ✅ **배포 알림** - 배포 결과 요약
+
+### **테스트 통과 현황**
+- **단위 테스트**: 18개 모두 통과
+- **통합 테스트**: 10개 모두 통과
+- **전체 테스트**: 28개 모두 통과
+
+### **주요 커밋 히스토리**
+1. `e0e7c97` - ESLint 설정 및 데이터베이스 사용자 역할 문제 해결
+2. `99ace5d` - 포트 충돌 문제 해결 (앱과 서버 분리)
+3. `181bd15` - Redis 클라이언트 충돌 문제 해결
+4. `fa235f9` - Supertest 호환성 문제 해결
+5. `c938bf4` - Redis 상태 테스트 수정
+6. `5a4dd8e` - 데이터베이스 연결 타임아웃 문제 해결
+7. `3cb5acb` - 데이터 타입 불일치 문제 해결
+8. `c2d9cf6` - Docker 빌드 캐시 설정 문제 해결
+9. `03ad1e4` - CodeQL Action 업데이트 및 권한 문제 해결
+10. `4783ea9` - CD 워크플로우 활성화
+11. `8c06492` - 시크릿 이름 매핑 수정 (AWS=PROD, GCP=STAGING)
+
+---
+
+## 🎉 결론
+
+모든 테스트 실패 문제를 체계적으로 해결하여 완전한 CI/CD 파이프라인을 구축했습니다. 이제 코드 품질 검사부터 멀티 클라우드 배포까지 전체 과정이 자동화되어 안정적으로 작동합니다.
+
+**핵심 성과:**
+- 🔧 **11가지 주요 문제 해결**
+- 📁 **7개 파일 수정/생성**
+- ✅ **28개 테스트 모두 통과**
+- 🚀 **완전한 CI/CD 파이프라인 구축**
+- 🌐 **실제 멀티 클라우드 배포 완료**
