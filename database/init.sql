@@ -5,7 +5,7 @@
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'myapp_user') THEN
-        CREATE ROLE myapp_user WITH LOGIN PASSWORD 'password';
+        CREATE ROLE myapp_user WITH LOGIN PASSWORD 'testpassword';
     END IF;
 END
 $$;
