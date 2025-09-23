@@ -2,8 +2,9 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// 테스트 환경 설정
+// 테스트 환경 설정 (가장 먼저 설정)
 process.env.NODE_ENV = 'test';
+process.env.PORT = '0'; // 포트 사용 방지
 
 // 데이터베이스 연결 설정
 const pool = new Pool({

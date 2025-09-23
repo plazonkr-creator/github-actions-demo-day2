@@ -464,62 +464,6 @@ app.use((error, req, res, next) => {
   });
 });
 
-// 서버 시작
-async function startServer() {
-  try {
-    // Redis 연결
-    await redisClient.connect();
-    logger.info('Redis connected successfully');
-    
-    // 데이터베이스 연결 테스트
-    await pool.query('SELECT 1');
-    logger.info('Database connected successfully');
-    
-    // 서버 시작
-    app.listen(port, () => {
-      logger.info(`🚀 Server running on port ${port}`);
-      logger.info(`📊 Metrics available at http://localhost:${port}/metrics`);
-      logger.info(`🏥 Health check available at http://localhost:${port}/health`);
-    });
-    
-  } catch (error) {
-    logger.error('Failed to start server:', error);
-    process.exit(1);
-  }
-}
-
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  
-  try {
-    await redisClient.quit();
-    await pool.end();
-    logger.info('Database and Redis connections closed');
-    process.exit(0);
-  } catch (error) {
-    logger.error('Error during shutdown:', error);
-    process.exit(1);
-  }
-});
-
-process.on('SIGINT', async () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  
-  try {
-    await redisClient.quit();
-    await pool.end();
-    logger.info('Database and Redis connections closed');
-    process.exit(0);
-  } catch (error) {
-    logger.error('Error during shutdown:', error);
-    process.exit(1);
-  }
-});
-
-// 테스트 환경이 아닐 때만 서버 시작
-if (process.env.NODE_ENV !== 'test') {
-  startServer();
-}
+// 서버 시작 로직은 server.js로 이동됨
 
 module.exports = app;
