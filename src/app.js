@@ -69,7 +69,9 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD || 'password',
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 10000, // 10초로 증가
+  acquireTimeoutMillis: 10000,    // 연결 획득 타임아웃 추가
+  statement_timeout: 30000,        // 쿼리 타임아웃 추가
 });
 
 // Redis 클라이언트는 외부에서 주입받음
