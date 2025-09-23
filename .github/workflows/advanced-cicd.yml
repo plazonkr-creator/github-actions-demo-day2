@@ -295,6 +295,9 @@ jobs:
         
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
+      with:
+        driver-opts: |
+          image=moby/buildkit:latest
       
     - name: Docker 이미지 빌드 및 푸시
       id: build
@@ -303,6 +306,8 @@ jobs:
         context: .
         push: true
         platforms: linux/amd64
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
         tags: |
           ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
           ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
@@ -312,9 +317,8 @@ jobs:
           org.opencontainers.image.description=Advanced CI/CD Pipeline Demo
           org.opencontainers.image.version=v2.0.0
           org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-          org.opencontainers.image.revision=${{ github.sha }}
-        cache-from: type=gha
-        cache-to: type=gha
+        build-args: |
+          BUILDKIT_INLINE_CACHE=1
 
   # 보안 스캔
   security-scan:
