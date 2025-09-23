@@ -372,7 +372,7 @@ jobs:
         host: ${{ secrets.PROD_VM_HOST }}
         username: ${{ secrets.PROD_VM_USERNAME }}
         key: ${{ secrets.PROD_VM_SSH_KEY }}
-        source: "docker-compose.prod.yml,nginx/nginx.prod.conf"
+        source: "docker-compose.prod.yml,nginx/nginx.prod.conf,Dockerfile"
         target: "/home/${{ secrets.PROD_VM_USERNAME }}/app/"
         
     - name: nginx 디렉토리 생성 및 설정 파일 배치
@@ -524,7 +524,7 @@ jobs:
         host: ${{ secrets.STAGING_VM_HOST }}
         username: ${{ secrets.STAGING_VM_USERNAME }}
         key: ${{ secrets.STAGING_VM_SSH_KEY }}
-        source: "docker-compose.prod.yml,nginx/nginx.prod.conf"
+        source: "docker-compose.prod.yml,nginx/nginx.prod.conf,Dockerfile"
         target: "/home/${{ secrets.STAGING_VM_USERNAME }}/app/"
         
     - name: nginx 디렉토리 생성 및 설정 파일 배치
@@ -641,7 +641,7 @@ jobs:
         host: ${{ secrets.PROD_VM_HOST }}
         username: ${{ secrets.PROD_VM_USERNAME }}
         key: ${{ secrets.PROD_VM_SSH_KEY }}
-        source: "docker-compose.prod.yml,nginx/nginx.prod.conf"
+        source: "docker-compose.prod.yml,nginx/nginx.prod.conf,Dockerfile"
         target: "/home/${{ secrets.PROD_VM_USERNAME }}/app/"
         
     - name: nginx 디렉토리 생성 및 설정 파일 배치
@@ -797,7 +797,7 @@ jobs:
         host: ${{ secrets.STAGING_VM_HOST }}
         username: ${{ secrets.STAGING_VM_USERNAME }}
         key: ${{ secrets.STAGING_VM_SSH_KEY }}
-        source: "docker-compose.prod.yml,nginx/nginx.prod.conf"
+        source: "docker-compose.prod.yml,nginx/nginx.prod.conf,Dockerfile"
         target: "/home/${{ secrets.STAGING_VM_USERNAME }}/app/"
         
     - name: nginx 디렉토리 생성 및 설정 파일 배치
