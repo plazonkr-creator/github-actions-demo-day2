@@ -74,12 +74,11 @@ const pool = new Pool({
 });
 
 // Redis 클라이언트 설정
-const redisClient = redis.createClient({
+const redisConfig = {
   socket: {
     host: process.env.REDIS_HOST || 'redis',
     port: process.env.REDIS_PORT || 6379,
   },
-  password: process.env.REDIS_PASSWORD || 'password',
   retry_strategy: (options) => {
     if (options.error && options.error.code === 'ECONNREFUSED') {
       logger.error('Redis server connection refused');
@@ -95,7 +94,14 @@ const redisClient = redis.createClient({
     }
     return Math.min(options.attempt * 100, 3000);
   }
-});
+};
+
+// 비밀번호가 설정된 경우에만 추가
+if (process.env.REDIS_PASSWORD && process.env.REDIS_PASSWORD.trim() !== '') {
+  redisConfig.password = process.env.REDIS_PASSWORD;
+}
+
+const redisClient = redis.createClient(redisConfig);
 
 redisClient.on('error', (err) => {
   logger.error('Redis Client Error:', err);
