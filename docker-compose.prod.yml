@@ -6,6 +6,7 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile
+      no_cache: true
     container_name: ${CONTAINER_PREFIX:-github-actions-demo}-app-prod
     ports:
       - "3000:3000"
