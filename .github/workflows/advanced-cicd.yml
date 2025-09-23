@@ -675,11 +675,11 @@ jobs:
     - name: AWS 프로덕션 배포 실행
       uses: appleboy/ssh-action@v1.0.0
       with:
-        host: ${{ secrets.AWS_VM_HOST }}
-        username: ${{ secrets.AWS_VM_USERNAME }}
-        key: ${{ secrets.AWS_VM_SSH_KEY }}
+        host: ${{ secrets.PROD_VM_HOST }}
+        username: ${{ secrets.PROD_VM_USERNAME }}
+        key: ${{ secrets.PROD_VM_SSH_KEY }}
         script: |
-          cd /home/${{ secrets.AWS_VM_USERNAME }}/app
+          cd /home/${{ secrets.PROD_VM_USERNAME }}/app
           
           # 환경 변수 설정
           export DB_PASSWORD="${{ secrets.PROD_DB_PASSWORD }}"
