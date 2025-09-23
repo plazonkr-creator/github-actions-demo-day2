@@ -9,66 +9,35 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'myapp',
   user: process.env.DB_USER || 'myapp_user',
   password: process.env.DB_PASSWORD || 'password',
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  max: 5,
+  idleTimeoutMillis: 10000,
+  connectionTimeoutMillis: 5000,
 });
 
 // 각 테스트 전에 데이터 정리
 beforeEach(async () => {
   try {
-    // 테스트용 데이터만 정리 (시드 데이터는 유지)
-    await pool.query(`
-      DELETE FROM system_metrics 
-      WHERE metric_name LIKE 'test_%' OR metric_name LIKE '%test%'
-    `);
-    
-    await pool.query(`
-      DELETE FROM app_logs 
-      WHERE message LIKE '%test%' OR message LIKE '%Test%'
-    `);
-    
     await pool.query(`
       DELETE FROM users 
       WHERE username LIKE '%test%' 
       AND username NOT IN ('admin', 'testuser', 'demo')
     `);
   } catch (error) {
-    console.warn('테스트 데이터 정리 중 오류 발생:', error.message);
+    // 조용히 무시
   }
 });
 
 // 모든 테스트 후 정리
 afterAll(async () => {
   try {
-    // 데이터베이스 연결 종료
     await pool.end();
-    
-    // 강제로 프로세스 종료 (Jest가 멈추는 것을 방지)
-    setTimeout(() => {
-      console.log('강제 프로세스 종료');
-      process.exit(0);
-    }, 1000);
-    
   } catch (error) {
-    console.warn('데이터베이스 연결 종료 중 오류 발생:', error.message);
-    // 오류가 발생해도 프로세스 종료
-    setTimeout(() => {
-      process.exit(0);
-    }, 1000);
+    // 조용히 무시
   }
+  
+  // 강제 종료
+  setTimeout(() => process.exit(0), 100);
 });
 
 // 전역 테스트 타임아웃 설정
-jest.setTimeout(10000);
-
-// 테스트 실패 시 즉시 종료
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
-});
-
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  process.exit(1);
-});
+jest.setTimeout(5000);

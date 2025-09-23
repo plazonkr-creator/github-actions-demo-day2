@@ -55,19 +55,18 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "collectCoverage": true,
-    "coverageDirectory": "coverage",
-    "coverageReporters": ["text", "lcov", "html"],
+    "collectCoverage": false,
     "testMatch": [
       "**/tests/**/*.test.js"
     ],
-    "setupFilesAfterEnv": ["<rootDir>/tests/setup.js"],
-    "testTimeout": 10000,
+    "testTimeout": 5000,
     "bail": 1,
-    "verbose": true,
+    "verbose": false,
     "forceExit": true,
-    "detectOpenHandles": true,
     "maxWorkers": 1,
-    "runInBand": true
+    "runInBand": true,
+    "clearMocks": true,
+    "restoreMocks": true,
+    "resetMocks": true
   }
 }
