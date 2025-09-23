@@ -6,7 +6,6 @@ const compression = require('compression');
 require('dotenv').config();
 
 const { Pool } = require('pg');
-const redis = require('redis');
 const winston = require('winston');
 const client = require('prom-client');
 
@@ -73,43 +72,13 @@ const pool = new Pool({
   connectionTimeoutMillis: 2000,
 });
 
-// Redis 클라이언트 설정
-const redisConfig = {
-  socket: {
-    host: process.env.REDIS_HOST || 'redis',
-    port: process.env.REDIS_PORT || 6379,
-  },
-  retry_strategy: (options) => {
-    if (options.error && options.error.code === 'ECONNREFUSED') {
-      logger.error('Redis server connection refused');
-      return new Error('Redis server connection refused');
-    }
-    if (options.total_retry_time > 1000 * 60 * 60) {
-      logger.error('Redis retry time exhausted');
-      return new Error('Retry time exhausted');
-    }
-    if (options.attempt > 10) {
-      logger.error('Redis max retry attempts reached');
-      return undefined;
-    }
-    return Math.min(options.attempt * 100, 3000);
-  }
-};
+// Redis 클라이언트는 외부에서 주입받음
+let redisClient = null;
 
-// 비밀번호가 설정된 경우에만 추가
-if (process.env.REDIS_PASSWORD && process.env.REDIS_PASSWORD.trim() !== '') {
-  redisConfig.password = process.env.REDIS_PASSWORD;
+// Redis 클라이언트 설정 함수
+function setRedisClient(client) {
+  redisClient = client;
 }
-
-const redisClient = redis.createClient(redisConfig);
-
-redisClient.on('error', (err) => {
-  logger.error('Redis Client Error:', err);
-});
-
-redisClient.on('connect', () => {
-  logger.info('Redis Client Connected');
-});
 
 // 미들웨어 설정
 app.use(helmet());
@@ -176,14 +145,21 @@ app.get('/health', async (req, res) => {
     };
     
     // Redis 연결 확인
-    const redisStart = Date.now();
-    await redisClient.ping();
-    const redisDuration = Date.now() - redisStart;
-    
-    healthCheck.checks.redis = {
-      status: 'connected',
-      responseTime: `${redisDuration}ms`
-    };
+    if (redisClient) {
+      const redisStart = Date.now();
+      await redisClient.ping();
+      const redisDuration = Date.now() - redisStart;
+      
+      healthCheck.checks.redis = {
+        status: 'connected',
+        responseTime: `${redisDuration}ms`
+      };
+    } else {
+      healthCheck.checks.redis = {
+        status: 'not_configured',
+        responseTime: '0ms'
+      };
+    }
     
     // 메모리 사용량
     const memUsage = process.memoryUsage();
@@ -225,7 +201,9 @@ app.get('/api/users', async (req, res) => {
     const result = await pool.query('SELECT * FROM users ORDER BY created_at DESC LIMIT 100');
     
     // Redis 캐시에 저장 (5분)
-    await redisClient.setEx('users:list', 300, JSON.stringify(result.rows));
+    if (redisClient) {
+      await redisClient.setEx('users:list', 300, JSON.stringify(result.rows));
+    }
     
     logger.info(`Retrieved ${result.rows.length} users`);
     res.json({
@@ -248,6 +226,10 @@ app.get('/api/users', async (req, res) => {
 // 캐시된 사용자 목록 조회
 app.get('/api/users/cached', async (req, res) => {
   try {
+    if (!redisClient) {
+      return res.redirect('/api/users');
+    }
+    
     const cached = await redisClient.get('users:list');
     
     if (cached) {
@@ -298,7 +280,9 @@ app.post('/api/users', async (req, res) => {
     );
     
     // 캐시 무효화
-    await redisClient.del('users:list');
+    if (redisClient) {
+      await redisClient.del('users:list');
+    }
     
     logger.info(`Created new user: ${username}`);
     res.status(201).json({
@@ -396,6 +380,14 @@ app.post('/api/logs', async (req, res) => {
 // Redis 상태 확인
 app.get('/api/redis/status', async (req, res) => {
   try {
+    if (!redisClient) {
+      return res.json({
+        success: false,
+        status: 'not_configured',
+        error: 'Redis client not configured'
+      });
+    }
+    
     const info = await redisClient.info();
     const ping = await redisClient.ping();
     
@@ -466,4 +458,4 @@ app.use((error, req, res, next) => {
 
 // 서버 시작 로직은 server.js로 이동됨
 
-module.exports = app;
+module.exports = { app, setRedisClient };

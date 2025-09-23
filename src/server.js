@@ -5,7 +5,7 @@
  * 프로덕션 환경에서만 실행됩니다.
  */
 
-const app = require('./app');
+const { app, setRedisClient } = require('./app');
 const { Pool } = require('pg');
 const redis = require('redis');
 const winston = require('winston');
@@ -85,6 +85,9 @@ async function startServer() {
     // Redis 연결
     await redisClient.connect();
     logger.info('Redis connected successfully');
+    
+    // app.js에 Redis 클라이언트 설정
+    setRedisClient(redisClient);
     
     // 데이터베이스 연결 테스트
     await pool.query('SELECT 1');
