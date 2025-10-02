@@ -1,11 +1,12 @@
 -- Day2 실습용 데이터베이스 초기화 스크립트
 -- PostgreSQL 데이터베이스 스키마 및 초기 데이터
+-- docker db 생성시 초기 읽어들이는 파일인데, 운영시에는 yaml 로 엔진만 생성 후 추가로 DB 생성해주는 방식으로 가야함.
 
 -- 데이터베이스 사용자 역할 생성
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'myapp_user') THEN
-        CREATE ROLE myapp_user WITH LOGIN PASSWORD 'testpassword';
+        CREATE ROLE myapp_user WITH LOGIN PASSWORD 'secure_prod_password_123';
     END IF;
 END
 $$;
