@@ -10,6 +10,9 @@ BEGIN
 END
 $$;
 
+-- 데이터베이스 생성
+Create database myapp_test;
+
 -- 데이터베이스 권한 설정
 GRANT CONNECT ON DATABASE myapp_test TO myapp_user;
 GRANT USAGE ON SCHEMA public TO myapp_user;
